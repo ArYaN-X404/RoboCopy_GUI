@@ -4,6 +4,12 @@ contextBridge.exposeInMainWorld('electron', {
   selectFolder: () => ipcRenderer.invoke('robocopy:select-folder'),
 });
 
+contextBridge.exposeInMainWorld('windowControls', {
+  minimize: () => ipcRenderer.send('window:minimize'),
+  maximize: () => ipcRenderer.send('window:maximize'),
+  close: () => ipcRenderer.send('window:close'),
+});
+
 contextBridge.exposeInMainWorld('robocopy', {
   run: ({ args, command, onProgress }) => {
     const logListener = (_, line) => {

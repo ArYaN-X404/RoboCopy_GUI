@@ -3,8 +3,10 @@ import {
   ArrowDownTrayIcon,
   CommandLineIcon,
   InformationCircleIcon,
+  MinusIcon,
   MoonIcon,
   PlayIcon,
+  Square2StackIcon,
   SunIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
@@ -85,10 +87,32 @@ function formatEta(seconds) {
   return `${hours}h ${remMins}m`;
 }
 
+function sanitizePath(input) {
+  if (!input) return '';
+  return input.replace(/^"+|"+$/g, '').replace(/[\\/]+$/, '');
+}
+
+function highlightLine(text) {
+  if (/\*EXTRA Dir|\*EXTRA File/i.test(text)) {
+    return { text, className: 'log-skip' };
+  }
+  if (/ERROR|Failed|denied|cannot/i.test(text)) {
+    return { text, className: 'log-error' };
+  }
+  if (/\\/i.test(text) && /\s{2,}/.test(text)) {
+    return { text, className: 'log-folder' };
+  }
+  if (/New File|Newer|Older|Same/i.test(text)) {
+    return { text, className: 'log-success' };
+  }
+  return { text, className: '' };
+}
+
 export default function App() {
   const [darkMode, setDarkMode] = useState(true);
   const [helpOpen, setHelpOpen] = useState(false);
   const [showLogs, setShowLogs] = useState(true);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [source, setSource] = useState(INITIAL_PRESET.source);
   const [destination, setDestination] = useState(INITIAL_PRESET.destination);
   const [mirror, setMirror] = useState(INITIAL_PRESET.mirror);
@@ -248,7 +272,7 @@ export default function App() {
   const handleFolderPicker = async (setter, ref) => {
     if (window?.electron?.selectFolder) {
       const selected = await window.electron.selectFolder();
-      if (selected) setter(selected);
+      if (selected) setter(sanitizePath(selected));
       return;
     }
     ref.current?.click();
@@ -259,7 +283,7 @@ export default function App() {
     if (!files || files.length === 0) return;
     const first = files[0];
     const name = first.path || first.webkitRelativePath?.split('/')[0] || first.name;
-    if (name) setter(name);
+    if (name) setter(sanitizePath(name));
     event.target.value = '';
   };
 
@@ -435,49 +459,83 @@ export default function App() {
   };
 
   const speedText = speedBps > 0 ? `${formatBytes(speedBps)}/s` : '—';
+  const highlightedLines = useMemo(() => logs.slice(-400).map(highlightLine), [logs]);
 
   return (
-    <div className="min-h-screen px-4 py-8 sm:px-6 lg:px-10">
-      <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
-        <div className="space-y-2">
-          <span className="glass-pill">Robocopy GUI</span>
-          <h1 className="text-3xl font-semibold text-white">RoboCopy Pro</h1>
-          <p className="text-sm text-white/60">
-            Simple, fast, and safe Robocopy control center.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="ghost" onClick={() => setHelpOpen(true)}>
-            <InformationCircleIcon className="h-5 w-5" />
-            Help
-          </Button>
-          <Button variant="ghost" onClick={() => setDarkMode((prev) => !prev)}>
-            {darkMode ? <MoonIcon className="h-5 w-5" /> : <SunIcon className="h-5 w-5" />}
-            {darkMode ? 'Dark' : 'Light'}
-          </Button>
-          <div className="crystal-item flex items-center gap-2 px-4 py-3 text-xs text-white/60">
-            <CommandLineIcon className="h-4 w-4" />
-            Ctrl + Enter to run
+    <div className="min-h-screen overflow-x-hidden px-4 pb-8">
+      <div className="squircle glass-crystal shadow-float mt-5 flex min-w-0 items-center justify-between gap-4 px-6 py-4" style={{ WebkitAppRegion: 'drag' }}>
+        <div className="flex min-w-0 items-center gap-4" style={{ WebkitAppRegion: 'no-drag' }}>
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-cyan-200">⟩⟩</div>
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold text-white truncate">
+              <span className="font-extrabold">Robo</span>
+              <span className="font-light">Copy</span>{' '}
+              <span className="text-gradient">Pro</span>
+            </h1>
+            <p className="text-xs text-white/50 truncate">Simple, fast, and safe Robocopy control center.</p>
           </div>
         </div>
-      </header>
+        <div className="flex items-center gap-3" style={{ WebkitAppRegion: 'no-drag' }}>
+          <div className="glass-chip squircle flex items-center gap-3 px-4 py-2 text-xs text-white/70">
+            <button type="button" className="glass-btn px-3 py-2" onClick={() => setHelpOpen(true)}>
+              <InformationCircleIcon className="h-4 w-4" />
+              Help
+            </button>
+            <button type="button" className="glass-btn px-3 py-2" onClick={() => setDarkMode((prev) => !prev)}>
+              {darkMode ? <MoonIcon className="h-4 w-4" /> : <SunIcon className="h-4 w-4" />}
+              {darkMode ? 'Dark' : 'Light'}
+            </button>
+            <span className="flex items-center gap-2 text-[11px] text-white/60">
+              <CommandLineIcon className="h-4 w-4" /> Ctrl + Enter
+            </span>
+          </div>
+          <div className="window-controls flex items-center gap-2">
+            <button
+              type="button"
+              className="window-btn"
+              onClick={() => window?.windowControls?.minimize()}
+              aria-label="Minimize"
+            >
+              <MinusIcon className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              className="window-btn"
+              onClick={() => window?.windowControls?.maximize()}
+              aria-label="Maximize"
+            >
+              <Square2StackIcon className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              className="window-btn window-btn-close"
+              onClick={() => window?.windowControls?.close()}
+              aria-label="Close"
+            >
+              <XMarkIcon className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="space-y-6">
+      <div className="mt-6 grid gap-6 px-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="min-w-0 space-y-6">
           <Panel title="Folders" description="Drag & drop or browse. Two clean boxes only.">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-6 md:grid-cols-2">
               <DropZone
+                kind="source"
                 label="Source"
                 description="Drop the folder you want to copy."
                 value={source}
-                onDropPath={setSource}
+                onDropPath={(value) => setSource(sanitizePath(value))}
                 onBrowse={() => handleFolderPicker(setSource, sourcePickerRef)}
               />
               <DropZone
+                kind="destination"
                 label="Destination"
                 description="Drop the folder that receives the files."
                 value={destination}
-                onDropPath={setDestination}
+                onDropPath={(value) => setDestination(sanitizePath(value))}
                 onBrowse={() => handleFolderPicker(setDestination, destinationPickerRef)}
               />
             </div>
@@ -499,24 +557,28 @@ export default function App() {
             />
           </Panel>
 
-          <Panel title="Transfer Mode" description="Quick intent selection for copy vs move.">
+          <Panel title="Copy Settings" description="All primary options in one focused panel.">
             <div className="grid gap-4 md:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => setMove(false)}
-                className={`crystal-item p-4 text-left ${!move ? 'border-cyan-400/50' : ''}`}
-              >
-                <p className="text-sm font-semibold text-white">Copy</p>
-                <p className="text-xs text-white/60">Keeps files in the source folder.</p>
-              </button>
-              <button
-                type="button"
-                onClick={() => setMove(true)}
-                className={`crystal-item p-4 text-left ${move ? 'border-cyan-400/50' : ''}`}
-              >
-                <p className="text-sm font-semibold text-white">Move</p>
-                <p className="text-xs text-white/60">Removes files from source after copying.</p>
-              </button>
+              <div className="md:col-span-2">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setMove(false)}
+                    className={`crystal-item squircle p-4 text-left focus-glow ${!move ? 'gradient-ring' : ''}`}
+                  >
+                    <p className="text-sm font-semibold text-white">Copy</p>
+                    <p className="text-xs text-white/60">Keeps files in the source folder.</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMove(true)}
+                    className={`crystal-item squircle p-4 text-left focus-glow ${move ? 'gradient-ring' : ''}`}
+                  >
+                    <p className="text-sm font-semibold text-white">Move</p>
+                    <p className="text-xs text-white/60">Removes files from source after copying.</p>
+                  </button>
+                </div>
+              </div>
               <div className="md:col-span-2">
                 <Select
                   label="Copy Mode"
@@ -528,11 +590,6 @@ export default function App() {
                   }))}
                 />
               </div>
-            </div>
-          </Panel>
-
-          <Panel title="Essential Options" description="Only the most used and beginner-friendly settings.">
-            <div className="grid gap-4 md:grid-cols-2">
               <Toggle
                 label="High-Speed Mode"
                 description="Disables resume + logging, lowers retries, and minimizes output."
@@ -557,7 +614,7 @@ export default function App() {
                 checked={logging}
                 onChange={setLogging}
               />
-              <div className="crystal-item flex flex-col gap-3 p-4">
+              <div className="crystal-item squircle flex flex-col gap-3 p-4 md:col-span-2">
                 <label className="text-sm font-semibold text-white/80">Subfolder Mode</label>
                 <div className="grid gap-2">
                   {[
@@ -569,57 +626,72 @@ export default function App() {
                       key={option.id}
                       type="button"
                       onClick={() => setSubdirMode(option.id)}
-                      className={`glass-btn justify-start ${subdirMode === option.id ? 'border-cyan-400/60 text-white' : ''}`}
+                      className={`glass-btn justify-start focus-glow ${subdirMode === option.id ? 'gradient-ring' : ''}`}
                     >
                       {option.label}
                     </button>
                   ))}
                 </div>
               </div>
-              <div className="crystal-item flex flex-col gap-3 p-4">
-                <label className="text-sm font-semibold text-white/80">Threads</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="128"
-                  className="glass-input"
-                  value={threads}
-                  onChange={(event) => setThreads(Number(event.target.value))}
-                />
-                <p className="text-xs text-white/60">Higher values = faster on SSD.</p>
-              </div>
-              <div className="crystal-item flex flex-col gap-3 p-4">
-                <label className="text-sm font-semibold text-white/80">Retry Count</label>
-                <input
-                  type="number"
-                  min="0"
-                  className="glass-input"
-                  value={retries}
-                  onChange={(event) => setRetries(Number(event.target.value))}
-                />
-                <p className="text-xs text-white/60">More retries = safer but slower.</p>
-              </div>
-              <div className="crystal-item flex flex-col gap-3 p-4">
-                <label className="text-sm font-semibold text-white/80">Wait Between Retries (sec)</label>
-                <input
-                  type="number"
-                  min="0"
-                  className="glass-input"
-                  value={wait}
-                  onChange={(event) => setWait(Number(event.target.value))}
-                />
-                <p className="text-xs text-white/60">Longer waits reduce speed.</p>
-              </div>
-              <div className="crystal-item flex flex-col gap-3 p-4 md:col-span-2">
-                <label className="text-sm font-semibold text-white/80">Ignore files/folders</label>
-                <input
-                  className="glass-input"
-                  placeholder="node_modules, .git, *.tmp"
-                  value={excludeText}
-                  onChange={(event) => setExcludeText(event.target.value)}
-                />
-                <p className="text-xs text-white/60">Use commas. Prefix with file: or dir: if needed.</p>
-              </div>
+            </div>
+
+            <div className="mt-6">
+              <button
+                type="button"
+                className="glass-btn w-full justify-between focus-glow"
+                onClick={() => setAdvancedOpen((prev) => !prev)}
+              >
+                <span>{advancedOpen ? 'Hide Advanced Options' : 'Show Advanced Options'}</span>
+                <span className="text-white/60">{advancedOpen ? '−' : '+'}</span>
+              </button>
+              {advancedOpen ? (
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <div className="crystal-item squircle flex flex-col gap-3 p-4">
+                    <label className="text-sm font-semibold text-white/80">Threads</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="128"
+                      className="glass-input"
+                      value={threads}
+                      onChange={(event) => setThreads(Number(event.target.value))}
+                    />
+                    <p className="text-xs text-white/60">Higher values = faster on SSD.</p>
+                  </div>
+                  <div className="crystal-item squircle flex flex-col gap-3 p-4">
+                    <label className="text-sm font-semibold text-white/80">Retry Count</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="glass-input"
+                      value={retries}
+                      onChange={(event) => setRetries(Number(event.target.value))}
+                    />
+                    <p className="text-xs text-white/60">More retries = safer but slower.</p>
+                  </div>
+                  <div className="crystal-item squircle flex flex-col gap-3 p-4">
+                    <label className="text-sm font-semibold text-white/80">Wait Between Retries (sec)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="glass-input"
+                      value={wait}
+                      onChange={(event) => setWait(Number(event.target.value))}
+                    />
+                    <p className="text-xs text-white/60">Longer waits reduce speed.</p>
+                  </div>
+                  <div className="crystal-item squircle flex flex-col gap-3 p-4 md:col-span-2">
+                    <label className="text-sm font-semibold text-white/80">Ignore files/folders</label>
+                    <input
+                      className="glass-input"
+                      placeholder="node_modules, .git, *.tmp"
+                      value={excludeText}
+                      onChange={(event) => setExcludeText(event.target.value)}
+                    />
+                    <p className="text-xs text-white/60">Use commas. Prefix with file: or dir: if needed.</p>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </Panel>
 
@@ -659,9 +731,26 @@ export default function App() {
           </Panel>
         </div>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
+          <Panel title="Terminal" description="Command preview and live output in one place.">
+            <div className="crystal-item squircle min-w-0 overflow-hidden">
+              <div className="flex items-center justify-between border-b border-white/10 px-4 py-2 text-xs text-white/60">
+                <span>Command</span>
+                <span className="glass-pill">Live</span>
+              </div>
+              <pre className="terminal-text min-w-0 overflow-x-auto px-4 py-4 text-sm text-cyan-200/90">
+                <code>{command}</code>
+              </pre>
+            </div>
+            {showLogs ? (
+              <div className="mt-4">
+                <ConsoleOutput lines={logs} highlightedLines={highlightedLines} />
+              </div>
+            ) : null}
+          </Panel>
+
           <Panel
-            title="Run"
+            title="Run & Progress"
             description="Execute Robocopy and watch progress live."
             actions={
               <div className="flex items-center gap-2">
@@ -677,7 +766,7 @@ export default function App() {
           >
             <div className="grid gap-4">
               <StatusIndicator status={status} progress={progress} indeterminate={scanning} />
-              <div className="crystal-item grid gap-2 p-4 text-xs text-white/60">
+              <div className="crystal-item squircle grid gap-2 p-4 text-xs text-white/60">
                 <div className="flex items-center justify-between">
                   <span>Mode</span>
                   <span className="text-white/80">{move ? 'Move' : 'Copy'}</span>
@@ -699,20 +788,6 @@ export default function App() {
               </div>
             </div>
           </Panel>
-
-          <Panel title="Command Preview" description="Live Robocopy command based on your selections.">
-            <div className="crystal-item overflow-hidden">
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-2 text-xs text-white/60">
-                <span>Command</span>
-                <span className="glass-pill">Live</span>
-              </div>
-              <pre className="overflow-x-auto px-4 py-4 text-sm text-cyan-200/90">
-                <code>{command}</code>
-              </pre>
-            </div>
-          </Panel>
-
-          {showLogs ? <ConsoleOutput lines={logs} /> : null}
         </div>
       </div>
 
@@ -723,7 +798,7 @@ export default function App() {
             onClick={() => setHelpOpen(false)}
           />
           <div className="absolute right-4 top-4 bottom-4 w-full max-w-md">
-            <div className="crystal-shell h-full overflow-hidden p-6">
+            <div className="crystal-shell squircle h-full overflow-hidden p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs uppercase tracking-[0.2em] text-white/50">Help Guide</p>
@@ -735,7 +810,7 @@ export default function App() {
               </div>
               <div className="mt-6 space-y-4 overflow-y-auto pr-2" style={{ maxHeight: 'calc(100% - 80px)' }}>
                 {HELP_ITEMS.map((item) => (
-                  <div key={item.title} className="crystal-item p-4">
+                  <div key={item.title} className="crystal-item squircle p-4">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-semibold text-white">{item.title}</p>
                       <span className="glass-pill">{item.flag}</span>

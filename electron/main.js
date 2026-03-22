@@ -44,11 +44,15 @@ function createWindow() {
     minHeight: 680,
     backgroundColor: '#0b1020',
     title: 'RoboCopy Pro',
+    frame: false,
+    titleBarStyle: 'hidden',
     webPreferences: {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
     },
   });
+
+  mainWindow.setMenuBarVisibility(false);
 
   if (isDev) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
@@ -88,6 +92,26 @@ ipcMain.on('robocopy:ui-progress', (event, value) => {
   if (!window) return;
   if (typeof value !== 'number') return;
   window.setProgressBar(value);
+});
+
+ipcMain.on('window:minimize', (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (window) window.minimize();
+});
+
+ipcMain.on('window:maximize', (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (!window) return;
+  if (window.isMaximized()) {
+    window.unmaximize();
+  } else {
+    window.maximize();
+  }
+});
+
+ipcMain.on('window:close', (event) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (window) window.close();
 });
 
 ipcMain.handle('robocopy:run', async (event, payload) => {
