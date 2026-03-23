@@ -1,88 +1,229 @@
-# RoboCopy Pro
+<h1 align="center">🚀 RoboCopy Pro</h1>
 
-![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)
-![Electron](https://img.shields.io/badge/Electron-191970?style=for-the-badge&logo=Electron&logoColor=white)
-![TailwindCSS](https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)
-![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)
+<p align="center">
+  A modern, glassmorphism GUI for Windows Robocopy  
+  <br/>
+  <b>Fast. Safe. Beautiful.</b>
+</p>
 
-A modern, glassmorphism GUI wrapper for Windows Robocopy. Built for speed, safety, and a frictionless user experience, it transforms complex command-line file operations into a seamless visual workflow.
+<p align="center">
+  <img src="https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB"/>
+  <img src="https://img.shields.io/badge/Electron-191970?style=for-the-badge&logo=Electron&logoColor=white"/>
+  <img src="https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white"/>
+  <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge"/>
+</p>
+
+<p align="center">
+  <a href="#"><img src="https://img.shields.io/badge/Download-Coming Soon-blue?style=for-the-badge"/></a>
+  <a href="#"><img src="https://img.shields.io/github/stars/your-username/your-repo?style=for-the-badge"/></a>
+  <a href="#"><img src="https://img.shields.io/github/issues/your-username/your-repo?style=for-the-badge"/></a>
+</p>
+
+---
+
+## 🎬 Demo
 
 <div align="center">
-  <img src="docs/screenshot-main.png" alt="RoboCopy Pro Main Interface" width="800"/>
+  <img src="docs/demo.gif" alt="RoboCopy Pro Demo" width="800"/>
 </div>
 
-## ✨ Highlights
-* **Frictionless UX:** Massive drag-and-drop zones for Source and Destination routing.
-* **Non-Blocking Architecture:** The React UI thread is completely isolated from the heavy I/O Robocopy child processes, ensuring the app never freezes during massive multi-gigabyte transfers.
-* **Live Telemetry:** Real-time Robocopy output parsing with syntax highlighting, visual progress bars, and ETA calculations.
-* **Native Integration:** Windows Taskbar progress indicators and native Toast notifications upon completion.
-* **Advanced Controls:** Granular control over thread counts (`/MT:n`), restartable modes (`/Z`), and directory exclusions (`/XD /XF`).
-* **One-Click Presets:** Save and load complex configurations for recurring backup tasks.
+---
+
+## 🖼 Screenshots
+
+<div align="center">
+
+### 🧩 Setup Interface
+<img src="docs/screenshot-main.png" width="800"/>
+
+---
+
+### ⚡ Running Transfer (Live)
+<img src="docs/screenshot-running.png" width="800"/>
+
+---
+
+### ✅ Completed Transfer
+<img src="docs/screenshot-completed.png" width="800"/>
+
+</div>
+
+---
+
+## ✨ Features
+
+### ⚡ Performance
+- Non-blocking architecture (no UI freezes during heavy transfers)
+- Multi-threaded copying (`/MT:n`) for maximum speed
+- Efficient handling of large-scale file operations
+
+### 🎯 User Experience
+- Massive drag-and-drop zones for Source & Destination
+- Clean glassmorphism UI with modern design principles
+- One-click presets for recurring workflows
+
+### 📊 Monitoring & Feedback
+- Real-time Robocopy output parsing
+- Live progress bars with ETA calculation
+- Syntax-highlighted logs for better readability
+
+### 🖥 Native Integration
+- Windows taskbar progress indicators
+- Native toast notifications on completion
+- Context menu integration (Explorer right-click)
+
+### 🧠 Advanced Controls
+- Restartable mode (`/Z`) for unstable transfers
+- Mirror mode (`/MIR`) for full directory sync
+- Custom retry logic (`/R:n /W:n`)
+- File & directory exclusions (`/XD /XF`)
+
+---
+
+## 💡 Why RoboCopy Pro?
+
+Robocopy is incredibly powerful — but not user-friendly.
+
+RoboCopy Pro was built to:
+- Eliminate command-line complexity
+- Reduce risk of destructive mistakes
+- Provide a visual, intuitive workflow
+- Bring a modern UI to a legacy tool
+
+---
+
+## 🏗 Architecture
+
+```
+React UI (Renderer)
+        ↓
+Electron (Main Process)
+        ↓
+Node.js Child Process
+        ↓
+Windows Robocopy Engine
+```
+
+- UI runs independently from heavy file operations  
+- Ensures zero freezing even during multi-GB transfers  
+
+---
 
 ## 🛠 Tech Stack
-* **Frontend:** React + Vite
-* **Styling:** Tailwind CSS (Custom Squircle & Glassmorphism UI)
-* **Desktop Shell:** Electron
-* **System APIs:** Native Node.js child-process execution
+
+| Layer | Technology |
+|------|-----------|
+| Frontend | React + Vite |
+| Styling | Tailwind CSS (Glassmorphism UI) |
+| Desktop Shell | Electron |
+| Backend | Node.js (child_process) |
+
+---
 
 ## 🚀 Getting Started
 
-### Prerequisites
-* Windows 10/11
-* Node.js 18+ (20+ recommended)
+### 📋 Prerequisites
+- Windows 10 / 11  
+- Node.js 18+ (20+ recommended)  
 
-### Local Development
-Clone the repository and run the development server:
+---
+
+### 💻 Local Development
+
 ```bash
 npm install
 npm run dev
 ```
-Build & Package
-To compile the application into a standalone executable:
 
-Bash
+---
+
+## 📦 Build & Package
+
+To create a standalone executable:
+
+```bash
 npm run build
 npm run dist
-Renderer assets are generated in dist/app/.
+```
 
-Executables are generated in the release/ folder:
+### ⚙️ Build Outputs
 
-npm run dist:portable -> Portable .exe (No installation required)
+| Command | Output |
+|--------|--------|
+| `npm run dist:portable` | Portable `.exe` (no installation required) |
+| `npm run dist:installer` | Installer `.exe` (NSIS setup) |
 
-npm run dist:installer -> Installer .exe (NSIS)
+---
 
-🖱 Windows Context Menu Integration
-The NSIS installer automatically adds a Windows Explorer context-menu action. Simply right-click any folder in Windows and select "Transfer with RoboCopy Pro". The app will launch with your selected folder instantly locked in as the Source.
+## 🖱 Windows Context Menu Integration
 
-📖 Quick Usage Guide
-Drag and drop a folder into Source and Destination.
+The installer automatically adds a context menu option.
 
-Select your Transfer Mode (Copy or Move).
+👉 Right-click any folder → **"Transfer with RoboCopy Pro"**
 
-Adjust essential options:
+- Instantly opens the app  
+- Auto-fills the selected folder as Source  
 
-Mirror (/MIR): Mirrors source to destination (Warning: Deletes extra files in destination).
+---
 
-Resume (/Z): Restartable mode for unstable network transfers.
+## 📖 Quick Usage Guide
 
-Threads (/MT:n): Enables multi-threaded copying for high-speed I/O.
+1. Drag & drop folders into **Source** and **Destination**  
+2. Choose transfer mode (Copy / Move)  
+3. Configure options:  
+   - **Mirror (`/MIR`)** – Sync directories *(⚠️ deletes extra files)*  
+   - **Resume (`/Z`)** – Restartable transfers  
+   - **Threads (`/MT:n`)** – Speed optimization  
+   - **Retries (`/R:n /W:n`)** – Error handling  
+4. Click **Run Robocopy**  
+5. Monitor progress in real-time  
 
-Retries (/R:n /W:n): Configures retry attempts and wait times for locked files.
+---
 
-Click Run Robocopy and monitor the live terminal.
+## 🗺 Roadmap
 
-🗺 Roadmap
-[ ] Implement Recent Paths history dropdown
+- [ ] Recent paths history dropdown  
+- [ ] SHA-256 file verification after transfer  
+- [ ] Advanced preset management system  
+- [ ] Dark mode enhancements  
+- [ ] Transfer analytics dashboard  
 
-[ ] Post-transfer cryptographic hash verification (SHA-256)
+---
 
-[ ] Expanded rich-preset management
+## ⚠️ Disclaimer
 
-⚠️ Disclaimer
-Robocopy is a highly powerful system utility. Features like Mirror Mode (/MIR) are destructive and will delete files in the destination directory to match the source. Use with caution.
+Robocopy is a powerful system utility.
 
-👨‍💻 Author
-Aryan Patel * If you find this tool helpful or use it in your daily workflow, consider giving the repo a ⭐!
+⚠️ Features like **Mirror Mode (`/MIR`) are destructive**  
+They will delete files in the destination to match the source.
 
-📄 License
-This project is licensed under the MIT License.
+👉 Always double-check before running critical operations.
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome!
+
+If you have ideas, improvements, or bug fixes:
+- Open an issue  
+- Submit a pull request  
+
+---
+
+## ⭐ Support
+
+If you find this project useful, consider giving it a **star ⭐**  
+It helps the project grow and reach more developers!
+
+---
+
+## 👨‍💻 Author
+
+**Aryan Patel**
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License**
