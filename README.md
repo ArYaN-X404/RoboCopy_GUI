@@ -1,75 +1,88 @@
 # RoboCopy Pro
 
-A modern, glassmorphism Robocopy GUI for Windows with drag‑drop folders, live logs, presets, and high‑speed transfer options.
+![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)
+![Electron](https://img.shields.io/badge/Electron-191970?style=for-the-badge&logo=Electron&logoColor=white)
+![TailwindCSS](https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)
 
-## Highlights
-- Drag & drop source and destination folders
-- Clean copy/move modes with safe defaults
-- Live Robocopy output with syntax highlighting
-- Progress, ETA, and taskbar progress
-- Presets for quick reuse
-- Advanced options (threads, retries, wait, excludes)
-- High‑speed toggle for maximum throughput
-- Windows notifications on completion
+A modern, glassmorphism GUI wrapper for Windows Robocopy. Built for speed, safety, and a frictionless user experience, it transforms complex command-line file operations into a seamless visual workflow.
 
-## Tech Stack
-- React + Vite
-- Tailwind CSS
-- Electron (desktop shell)
+<div align="center">
+  <img src="docs/screenshot-main.png" alt="RoboCopy Pro Main Interface" width="800"/>
+</div>
 
-## Screenshots
-Add your screenshots here:
-- `docs/screenshot-main.png`
-- `docs/screenshot-terminal.png`
+## ✨ Highlights
+* **Frictionless UX:** Massive drag-and-drop zones for Source and Destination routing.
+* **Non-Blocking Architecture:** The React UI thread is completely isolated from the heavy I/O Robocopy child processes, ensuring the app never freezes during massive multi-gigabyte transfers.
+* **Live Telemetry:** Real-time Robocopy output parsing with syntax highlighting, visual progress bars, and ETA calculations.
+* **Native Integration:** Windows Taskbar progress indicators and native Toast notifications upon completion.
+* **Advanced Controls:** Granular control over thread counts (`/MT:n`), restartable modes (`/Z`), and directory exclusions (`/XD /XF`).
+* **One-Click Presets:** Save and load complex configurations for recurring backup tasks.
 
-## Requirements
-- Windows 10/11
-- Node.js 18+ (recommended 20+)
+## 🛠 Tech Stack
+* **Frontend:** React + Vite
+* **Styling:** Tailwind CSS (Custom Squircle & Glassmorphism UI)
+* **Desktop Shell:** Electron
+* **System APIs:** Native Node.js child-process execution
 
-## Getting Started
+## 🚀 Getting Started
+
+### Prerequisites
+* Windows 10/11
+* Node.js 18+ (20+ recommended)
+
+### Local Development
+Clone the repository and run the development server:
 ```bash
 npm install
 npm run dev
 ```
+Build & Package
+To compile the application into a standalone executable:
 
-## Build (Portable EXE)
-```bash
+Bash
 npm run build
 npm run dist
-```
-The portable executable will be generated in `dist/`.
+Renderer assets are generated in dist/app/.
 
-## Usage
-1. Drop a folder into **Source** and **Destination**.
-2. Choose **Copy** or **Move**.
-3. Adjust options (Mirror, Resume, Logging, etc.).
-4. Click **Run Robocopy**.
+Executables are generated in the release/ folder:
 
-## Options (Quick Guide)
-- **Mirror**: `/MIR` mirrors source to destination (deletes extras)
-- **Resume**: `/Z` restartable mode (safer but slower)
-- **High‑Speed**: minimizes output and disables slow options
-- **Threads**: `/MT:n` parallel copy for faster I/O
-- **Retries/Wait**: `/R:n /W:n` for locked files
-- **Exclude**: `/XD /XF` (comma‑separated patterns)
+npm run dist:portable -> Portable .exe (No installation required)
 
-## Troubleshooting
-**Blank window after build**
-- Ensure `vite.config.js` uses `base: './'`
-- In Electron, `loadFile` should point to built `dist/index.html`
+npm run dist:installer -> Installer .exe (NSIS)
 
-**Robocopy exit codes**
-- Some non‑zero codes are warnings (not always failures)
-- Check the live console output for details
+🖱 Windows Context Menu Integration
+The NSIS installer automatically adds a Windows Explorer context-menu action. Simply right-click any folder in Windows and select "Transfer with RoboCopy Pro". The app will launch with your selected folder instantly locked in as the Source.
 
-## Roadmap Ideas
-- Recent paths
-- Context‑menu integration
-- Hash verification
-- Richer presets
+📖 Quick Usage Guide
+Drag and drop a folder into Source and Destination.
 
-## Disclaimer
-Robocopy is powerful. **/MIR can delete files** in the destination. Use carefully.
+Select your Transfer Mode (Copy or Move).
 
-## License
-MIT
+Adjust essential options:
+
+Mirror (/MIR): Mirrors source to destination (Warning: Deletes extra files in destination).
+
+Resume (/Z): Restartable mode for unstable network transfers.
+
+Threads (/MT:n): Enables multi-threaded copying for high-speed I/O.
+
+Retries (/R:n /W:n): Configures retry attempts and wait times for locked files.
+
+Click Run Robocopy and monitor the live terminal.
+
+🗺 Roadmap
+[ ] Implement Recent Paths history dropdown
+
+[ ] Post-transfer cryptographic hash verification (SHA-256)
+
+[ ] Expanded rich-preset management
+
+⚠️ Disclaimer
+Robocopy is a highly powerful system utility. Features like Mirror Mode (/MIR) are destructive and will delete files in the destination directory to match the source. Use with caution.
+
+👨‍💻 Author
+Aryan Patel * If you find this tool helpful or use it in your daily workflow, consider giving the repo a ⭐!
+
+📄 License
+This project is licensed under the MIT License.
