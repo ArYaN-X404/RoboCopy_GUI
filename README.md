@@ -15,8 +15,8 @@
 
 <p align="center">
   <a href="#"><img src="https://img.shields.io/badge/Download-Coming Soon-blue?style=for-the-badge"/></a>
-  <a href="#"><img src="https://img.shields.io/github/stars/your-username/your-repo?style=for-the-badge"/></a>
-  <a href="#"><img src="https://img.shields.io/github/issues/your-username/your-repo?style=for-the-badge"/></a>
+  <a href="#"><img src="https://img.shields.io/github/stars/ArYaN-X404/RoboCopy_GUI?style=for-the-badge"/></a>
+  <a href="#"><img src="https://img.shields.io/github/issues/ArYaN-X404/RoboCopy_GUI?style=for-the-badge"/></a>
 </p>
 
 ---
