@@ -5,6 +5,26 @@ const fs = require('fs/promises');
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 
+async function resolveRobocopyArgs(args) {
+  const logDir = path.join(app.getPath('userData'), 'logs');
+  const logPath = path.join(logDir, 'robocopy.log');
+  let usesLogFile = false;
+
+  const nextArgs = args.map((arg) => {
+    if (/^\/LOG(?::|$)/i.test(arg)) {
+      usesLogFile = true;
+      return `/LOG:${logPath}`;
+    }
+    return arg;
+  });
+
+  if (usesLogFile) {
+    await fs.mkdir(logDir, { recursive: true });
+  }
+
+  return { args: nextArgs, logPath: usesLogFile ? logPath : null };
+}
+
 async function getFolderSize(rootPath) {
   let total = 0;
   const stack = [rootPath];
@@ -115,7 +135,8 @@ ipcMain.on('window:close', (event) => {
 });
 
 ipcMain.handle('robocopy:run', async (event, payload) => {
-  const { args, command } = payload;
+  const { command } = payload;
+  const { args, logPath } = await resolveRobocopyArgs(payload.args || []);
   const window = BrowserWindow.fromWebContents(event.sender);
   if (window) window.setProgressBar(0);
 
@@ -123,6 +144,9 @@ ipcMain.handle('robocopy:run', async (event, payload) => {
     try {
       if (window) {
         window.webContents.send('robocopy:log', `Command: robocopy ${args.join(' ')}`);
+        if (logPath) {
+          window.webContents.send('robocopy:log', `Log file: ${logPath}`);
+        }
       }
       const proc = spawn('robocopy', args, { windowsHide: true });
 
