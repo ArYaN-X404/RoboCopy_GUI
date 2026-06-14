@@ -1,4 +1,4 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,38 +6,38 @@
 
 @layer base {
   :root {
-    --background: 222 35% 8%;
+    --background: 224 45% 4%;
     --foreground: 218 44% 96%;
 
-    --card: 222 31% 11%;
+    --card: 224 35% 7%;
     --card-foreground: 218 44% 96%;
 
     --primary: 232 95% 66%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 223 29% 16%;
+    --secondary: 224 25% 10%;
     --secondary-foreground: 218 44% 96%;
 
-    --muted: 223 23% 15%;
+    --muted: 224 20% 9%;
     --muted-foreground: 220 18% 72%;
 
-    --accent: 196 89% 62%;
+    --accent: 196 95% 58%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 63% 31%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 224 23% 20%;
-    --input: 224 23% 20%;
+    --border: 224 25% 14%;
+    --input: 224 25% 14%;
     --ring: 232 95% 66%;
 
     --radius: 1rem;
 
-    --gradient-primary: linear-gradient(135deg, hsl(232 95% 66%), hsl(196 89% 62%));
-    --gradient-hero: linear-gradient(140deg, hsl(224 42% 6%), hsl(232 40% 11%), hsl(223 36% 9%));
-    --gradient-card: linear-gradient(145deg, hsl(223 29% 14%), hsl(223 27% 10%));
-    --shadow-card: 0 12px 30px -14px hsl(0 0% 0% / 0.45);
-    --shadow-card-hover: 0 24px 50px -18px hsl(232 95% 66% / 0.3);
+    --gradient-primary: linear-gradient(135deg, hsl(232 95% 66%), hsl(196 95% 58%));
+    --gradient-hero: linear-gradient(140deg, hsl(224 45% 3%), hsl(232 40% 7%), hsl(224 35% 5%));
+    --gradient-card: linear-gradient(145deg, hsl(224 35% 9%), hsl(224 35% 6%));
+    --shadow-card: 0 12px 30px -14px hsl(0 0% 0% / 0.65);
+    --shadow-card-hover: 0 24px 50px -18px hsl(232 95% 66% / 0.45);
   }
 
   .dark {
@@ -278,5 +278,20 @@
 
   .log-folder {
     color: #79c0ff;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 9999px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
   }
 }

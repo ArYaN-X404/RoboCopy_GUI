@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDownTrayIcon,
   CommandLineIcon,
@@ -10,6 +10,11 @@ import {
   Square2StackIcon,
   SunIcon,
   XMarkIcon,
+  FolderIcon,
+  ArrowPathIcon,
+  Cog6ToothIcon,
+  BoltIcon,
+  CpuChipIcon,
 } from '@heroicons/react/24/outline';
 import Button from './components/Button.jsx';
 import Panel from './components/Panel.jsx';
@@ -160,6 +165,7 @@ export default function App() {
   const [scanning, setScanning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [verificationSummary, setVerificationSummary] = useState(null);
+  const [terminalTab, setTerminalTab] = useState('command');
 
   const totalBytesRef = useRef(0);
   const copiedBytesRef = useRef(0);
@@ -353,6 +359,7 @@ export default function App() {
     setStatus('running');
     setProgress(0);
     setLoading(true);
+    setTerminalTab('output');
     setLogs([
       `Starting Robocopy session at ${new Date().toLocaleTimeString()}`,
       command,
@@ -383,9 +390,11 @@ export default function App() {
       setStatus('error');
       setProgress(0);
       setLogs(['Please provide both Source and Destination folders.']);
+      setTerminalTab('output');
       return;
     }
 
+    setTerminalTab('output');
     if (window?.robocopy?.run) {
       setStatus('running');
       setProgress(0);
@@ -542,398 +551,542 @@ export default function App() {
   const highlightedLines = useMemo(() => logs.slice(-400).map(highlightLine), [logs]);
 
   return (
-    <div className="min-h-screen overflow-x-hidden px-4 pb-8">
-      <div className="squircle glass-crystal shadow-float mt-5 flex min-w-0 items-center justify-between gap-4 px-6 py-4" style={{ WebkitAppRegion: 'drag' }}>
-        <div className="flex min-w-0 items-center gap-4" style={{ WebkitAppRegion: 'no-drag' }}>
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-cyan-200">⟩⟩</div>
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold text-white truncate">
-              <span className="font-extrabold">Robo</span>
-              <span className="font-light">Copy</span>{' '}
-              <span className="text-gradient">Pro</span>
-            </h1>
-            <p className="text-xs text-white/50 truncate">Simple, fast, and safe Robocopy control center.</p>
+    <div className={`h-screen w-screen overflow-hidden flex flex-col transition-colors duration-300 ${darkMode ? 'bg-[#03050a]' : 'bg-[#0f172a]'} font-sans antialiased text-white/90`}>
+      <div className="w-full h-full flex flex-col overflow-hidden bg-slate-950/10">
+        
+        {/* Custom Header / Titlebar */}
+        <div className="border-b border-white/5 bg-black/45 px-6 py-4 flex items-center justify-between" style={{ WebkitAppRegion: 'drag' }}>
+          <div className="flex items-center gap-3" style={{ WebkitAppRegion: 'no-drag' }}>
+            <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-white shadow-[0_0_15px_rgba(79,70,229,0.4)]">
+              R
+            </div>
+            <div>
+              <h1 className="text-md font-semibold text-white tracking-tight flex items-center gap-1">
+                <span className="font-extrabold text-blue-400">Robo</span>
+                <span className="font-light text-slate-200">Copy</span>
+                <span className="text-xs px-1.5 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-400 ml-1 font-semibold">Pro</span>
+              </h1>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-3" style={{ WebkitAppRegion: 'no-drag' }}>
-          <div className="glass-chip squircle flex items-center gap-3 px-4 py-2 text-xs text-white/70">
-            <button type="button" className="glass-btn px-3 py-2" onClick={() => setHelpOpen(true)}>
+          
+          <div className="flex items-center gap-3" style={{ WebkitAppRegion: 'no-drag' }}>
+            <button
+              type="button"
+              className="glass-btn px-3 py-1.5 text-xs text-white/80 hover:text-white"
+              onClick={() => setHelpOpen(true)}
+            >
               <InformationCircleIcon className="h-4 w-4" />
               Help
             </button>
-            <button type="button" className="glass-btn px-3 py-2" onClick={() => setDarkMode((prev) => !prev)}>
+            <button
+              type="button"
+              className="glass-btn px-3 py-1.5 text-xs text-white/80 hover:text-white"
+              onClick={() => setDarkMode((prev) => !prev)}
+            >
               {darkMode ? <MoonIcon className="h-4 w-4" /> : <SunIcon className="h-4 w-4" />}
               {darkMode ? 'Dark' : 'Light'}
             </button>
-            <span className="flex items-center gap-2 text-[11px] text-white/60">
-              <CommandLineIcon className="h-4 w-4" /> Ctrl + Enter
-            </span>
-          </div>
-          <div className="window-controls flex items-center gap-2">
-            <button
-              type="button"
-              className="window-btn"
-              onClick={() => window?.windowControls?.minimize()}
-              aria-label="Minimize"
-            >
-              <MinusIcon className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              className="window-btn"
-              onClick={() => window?.windowControls?.maximize()}
-              aria-label="Maximize"
-            >
-              <Square2StackIcon className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              className="window-btn window-btn-close"
-              onClick={() => window?.windowControls?.close()}
-              aria-label="Close"
-            >
-              <XMarkIcon className="h-4 w-4" />
-            </button>
+            
+            <div className="window-controls flex items-center gap-1.5 ml-2 border border-white/5 bg-white/5 p-1 rounded-xl">
+              <button
+                type="button"
+                className="window-btn flex h-7 w-7 items-center justify-center rounded-lg hover:bg-white/5 text-white/60 hover:text-white transition"
+                onClick={() => window?.windowControls?.minimize()}
+                aria-label="Minimize"
+              >
+                <MinusIcon className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                className="window-btn flex h-7 w-7 items-center justify-center rounded-lg hover:bg-white/5 text-white/60 hover:text-white transition"
+                onClick={() => window?.windowControls?.maximize()}
+                aria-label="Maximize"
+              >
+                <Square2StackIcon className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                className="window-btn flex h-7 w-7 items-center justify-center rounded-lg hover:bg-rose-500/25 text-white/60 hover:text-rose-200 transition"
+                onClick={() => window?.windowControls?.close()}
+                aria-label="Close"
+              >
+                <XMarkIcon className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="mt-6 grid gap-6 px-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="min-w-0 space-y-6">
-          <Panel title="Folders" description="Drag & drop or browse. Two clean boxes only.">
-            <div className="grid gap-6 md:grid-cols-2">
-              <DropZone
-                kind="source"
-                label="Source"
-                description="Drop the folder you want to copy."
-                value={source}
-                onDropPath={(value) => setSource(sanitizePath(value))}
-                onBrowse={() => handleFolderPicker(setSource, sourcePickerRef)}
-              />
-              <DropZone
-                kind="destination"
-                label="Destination"
-                description="Drop the folder that receives the files."
-                value={destination}
-                onDropPath={(value) => setDestination(sanitizePath(value))}
-                onBrowse={() => handleFolderPicker(setDestination, destinationPickerRef)}
-              />
-            </div>
-            <input
-              ref={sourcePickerRef}
-              type="file"
-              className="hidden"
-              webkitdirectory="true"
-              directory="true"
-              onChange={(event) => handleFolderChange(event, setSource)}
-            />
-            <input
-              ref={destinationPickerRef}
-              type="file"
-              className="hidden"
-              webkitdirectory="true"
-              directory="true"
-              onChange={(event) => handleFolderChange(event, setDestination)}
-            />
-          </Panel>
-
-          <Panel title="Copy Settings" description="All primary options in one focused panel.">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="md:col-span-2">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => setMove(false)}
-                    className={`crystal-item squircle p-4 text-left focus-glow ${!move ? 'gradient-ring' : ''}`}
-                  >
-                    <p className="text-sm font-semibold text-white">Copy</p>
-                    <p className="text-xs text-white/60">Keeps files in the source folder.</p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMove(true)}
-                    className={`crystal-item squircle p-4 text-left focus-glow ${move ? 'gradient-ring' : ''}`}
-                  >
-                    <p className="text-sm font-semibold text-white">Move</p>
-                    <p className="text-xs text-white/60">Removes files from source after copying.</p>
-                  </button>
-                </div>
+        {/* Main Split Layout */}
+        <div className="grid lg:grid-cols-[1.2fr_0.8fr] flex-grow min-h-0 overflow-hidden">
+          
+          {/* LEFT COLUMN: Input Control Zone */}
+          <div className="p-6 space-y-5 bg-slate-950/20 border-r border-white/5 overflow-y-auto h-full scrollbar-thin">
+            
+            {/* Folders Section */}
+            <div className="space-y-2.5">
+              <div className="section-label">
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <FolderIcon className="h-3.5 w-3.5" />
+                  Folders
+                </span>
               </div>
-              <div className="md:col-span-2">
+              <div className="grid gap-4 md:grid-cols-2">
+                <DropZone
+                  kind="source"
+                  label="Source"
+                  description="Files to copy from"
+                  value={source}
+                  onDropPath={(value) => setSource(sanitizePath(value))}
+                  onBrowse={() => handleFolderPicker(setSource, sourcePickerRef)}
+                />
+                <DropZone
+                  kind="destination"
+                  label="Destination"
+                  description="Where files land"
+                  value={destination}
+                  onDropPath={(value) => setDestination(sanitizePath(value))}
+                  onBrowse={() => handleFolderPicker(setDestination, destinationPickerRef)}
+                />
+              </div>
+            </div>
+
+            {/* Operation Selector Toggle */}
+            <div className="space-y-2">
+              <div className="section-label">
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <ArrowPathIcon className="h-3.5 w-3.5" />
+                  Operation
+                </span>
+              </div>
+              <div className="grid grid-cols-2 bg-slate-950/60 border border-white/5 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setMove(false)}
+                  className={`py-2 px-3 rounded-lg text-center transition-all ${
+                    !move
+                      ? 'bg-blue-600/20 border border-blue-500/35 text-blue-200 shadow-sm'
+                      : 'text-white/40 hover:text-white/70 border border-transparent'
+                  }`}
+                >
+                  <p className="text-xs font-semibold">Copy</p>
+                  <p className="text-[10px] opacity-70">Keeps originals in source</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMove(true)}
+                  className={`py-2 px-3 rounded-lg text-center transition-all ${
+                    move
+                      ? 'bg-blue-600/20 border border-blue-500/35 text-blue-200 shadow-sm'
+                      : 'text-white/40 hover:text-white/70 border border-transparent'
+                  }`}
+                >
+                  <p className="text-xs font-semibold">Move</p>
+                  <p className="text-[10px] opacity-70">Removes after copying</p>
+                </button>
+              </div>
+            </div>
+
+            {/* Copy Settings */}
+            <div className="space-y-2">
+              <div className="section-label">
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <Cog6ToothIcon className="h-3.5 w-3.5" />
+                  Copy Settings
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <Select
                   label="Copy Mode"
                   value={copyMode}
                   onChange={setCopyMode}
                   options={COPY_MODES.map((mode) => ({
                     value: mode.id,
-                    label: `${mode.label} — ${mode.description}`,
+                    label: mode.label,
                   }))}
                 />
-              </div>
-              <div className="md:col-span-2">
                 <Select
                   label="Verification"
                   value={verificationMode}
                   onChange={setVerificationMode}
-                  options={VERIFICATION_MODES}
+                  options={VERIFICATION_MODES.map((mode) => ({
+                    value: mode.value,
+                    label: mode.value === 'off' ? 'Disabled' : mode.value.charAt(0).toUpperCase() + mode.value.slice(1),
+                  }))}
                 />
-              </div>
-              <Toggle
-                label="High-Speed Mode"
-                description="Disables resume + logging, lowers retries, and minimizes output."
-                checked={highSpeed}
-                onChange={setHighSpeed}
-              />
-              <Toggle
-                label="Mirror Mode"
-                description="/MIR makes destination match source (deletes extras)."
-                checked={mirror}
-                onChange={setMirror}
-              />
-              <Toggle
-                label="Resume Transfers"
-                description="/Z resumes if the copy is interrupted (slower)."
-                checked={resume}
-                onChange={setResume}
-              />
-              <Toggle
-                label="Enable Logging"
-                description="/LOG writes a file log (slower on large jobs)."
-                checked={logging}
-                onChange={setLogging}
-              />
-              <div className="crystal-item squircle flex flex-col gap-3 p-4 md:col-span-2">
-                <label className="text-sm font-semibold text-white/80">Subfolder Mode</label>
-                <div className="grid gap-2">
-                  {[
-                    { id: 'all', label: 'All subfolders (/E)' },
-                    { id: 'non-empty', label: 'Only non-empty (/S)' },
-                    { id: 'none', label: 'Top level only' },
-                  ].map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => setSubdirMode(option.id)}
-                      className={`glass-btn justify-start focus-glow ${subdirMode === option.id ? 'gradient-ring' : ''}`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
 
-            <div className="mt-6">
+            {/* Options Toggle Grid */}
+            <div className="space-y-2">
+              <div className="section-label">
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <BoltIcon className="h-3.5 w-3.5" />
+                  Options
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Toggle
+                  label="High-Speed Mode"
+                  description="Disable logging & resume"
+                  checked={highSpeed}
+                  onChange={setHighSpeed}
+                />
+                <Toggle
+                  label="Mirror Mode"
+                  description="Deletes extra destination files"
+                  checked={mirror}
+                  onChange={setMirror}
+                />
+                <Toggle
+                  label="Resume Transfers"
+                  description="Support paused copies (/Z)"
+                  checked={resume}
+                  onChange={setResume}
+                />
+                <Toggle
+                  label="Enable Logging"
+                  description="Generate file copy log"
+                  checked={logging}
+                  onChange={setLogging}
+                />
+              </div>
+            </div>
+
+            {/* Advanced Settings */}
+            <div className="space-y-2">
               <button
                 type="button"
-                className="glass-btn w-full justify-between focus-glow"
+                className="glass-btn w-full justify-between text-xs py-2 px-3 focus-glow hover:bg-white/5 transition"
                 onClick={() => setAdvancedOpen((prev) => !prev)}
               >
-                <span>{advancedOpen ? 'Hide Advanced Options' : 'Show Advanced Options'}</span>
-                <span className="text-white/60">{advancedOpen ? '−' : '+'}</span>
+                <span className="font-semibold flex items-center gap-2">
+                  <CpuChipIcon className="h-4 w-4 text-blue-400" />
+                  Advanced Settings
+                </span>
+                <span className="text-white/40 font-bold">{advancedOpen ? '−' : '+'}</span>
               </button>
-              {advancedOpen ? (
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <div className="crystal-item squircle flex flex-col gap-3 p-4">
-                    <label className="text-sm font-semibold text-white/80">Threads</label>
+              {advancedOpen && (
+                <div className="grid gap-3 grid-cols-2 p-1.5 bg-black/15 rounded-xl border border-white/5 animate-fadeIn">
+                  <div className="crystal-item squircle flex flex-col gap-1 p-3">
+                    <label className="text-xs font-semibold text-white/80">Threads</label>
                     <input
                       type="number"
                       min="1"
                       max="128"
-                      className="glass-input"
+                      className="glass-input py-1 px-2.5 text-xs"
                       value={threads}
                       onChange={(event) => setThreads(Number(event.target.value))}
                     />
-                    <p className="text-xs text-white/60">Higher values = faster on SSD.</p>
+                    <p className="text-[10px] text-white/40">Parallel speed threads</p>
                   </div>
-                  <div className="crystal-item squircle flex flex-col gap-3 p-4">
-                    <label className="text-sm font-semibold text-white/80">Retry Count</label>
+                  <div className="crystal-item squircle flex flex-col gap-1 p-3">
+                    <label className="text-xs font-semibold text-white/80">Retries</label>
                     <input
                       type="number"
                       min="0"
-                      className="glass-input"
+                      className="glass-input py-1 px-2.5 text-xs"
                       value={retries}
                       onChange={(event) => setRetries(Number(event.target.value))}
                     />
-                    <p className="text-xs text-white/60">More retries = safer but slower.</p>
+                    <p className="text-[10px] text-white/40">Retry count on lock</p>
                   </div>
-                  <div className="crystal-item squircle flex flex-col gap-3 p-4">
-                    <label className="text-sm font-semibold text-white/80">Wait Between Retries (sec)</label>
+                  <div className="crystal-item squircle flex flex-col gap-1 p-3">
+                    <label className="text-xs font-semibold text-white/80">Retry Wait (sec)</label>
                     <input
                       type="number"
                       min="0"
-                      className="glass-input"
+                      className="glass-input py-1 px-2.5 text-xs"
                       value={wait}
                       onChange={(event) => setWait(Number(event.target.value))}
                     />
-                    <p className="text-xs text-white/60">Longer waits reduce speed.</p>
+                    <p className="text-[10px] text-white/40">Retry delay seconds</p>
                   </div>
-                  <div className="crystal-item squircle flex flex-col gap-3 p-4 md:col-span-2">
-                    <label className="text-sm font-semibold text-white/80">Ignore files/folders</label>
+                  <div className="crystal-item squircle flex flex-col gap-1 p-3">
+                    <label className="text-xs font-semibold text-white/80">Ignore Filters</label>
                     <input
-                      className="glass-input"
-                      placeholder="node_modules, .git, *.tmp"
+                      className="glass-input py-1 px-2.5 text-xs"
+                      placeholder="node_modules, *.tmp"
                       value={excludeText}
                       onChange={(event) => setExcludeText(event.target.value)}
                     />
-                    <p className="text-xs text-white/60">Use commas. Prefix with file: or dir: if needed.</p>
+                    <p className="text-[10px] text-white/40">Exclude list names</p>
                   </div>
                 </div>
-              ) : null}
+              )}
             </div>
-          </Panel>
 
-          <Panel
-            title="Presets"
-            description="Save a clean set of common profiles."
-            actions={
-              <Button variant="ghost" onClick={handleSavePreset}>
-                <ArrowDownTrayIcon className="h-5 w-5" />
-                Save Preset
-              </Button>
-            }
-          >
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="space-y-2">
-                <span className="text-sm font-semibold text-white/80">Preset Name</span>
-                <input
-                  className="glass-input w-full"
-                  value={presetName}
-                  onChange={(event) => setPresetName(event.target.value)}
-                  placeholder="Daily backup"
+            {/* Presets Manager */}
+            <div className="crystal-shell p-4 rounded-2xl border border-white/5 bg-slate-950/15">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                  Presets
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSavePreset}
+                  disabled={!presetName.trim()}
+                  className="glass-btn text-[10px] px-2.5 py-1 flex items-center gap-1 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 disabled:opacity-40"
+                >
+                  <ArrowDownTrayIcon className="h-3 w-3" />
+                  Save Preset
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-semibold text-white/50 block mb-1">Preset Name</label>
+                  <input
+                    className="glass-input py-1.5 px-2.5 text-xs"
+                    value={presetName}
+                    onChange={(event) => setPresetName(event.target.value)}
+                    placeholder="e.g. Daily Backup"
+                  />
+                </div>
+                <Select
+                  label="Load Preset"
+                  value={selectedPreset}
+                  onChange={handleLoadPreset}
+                  options={[
+                    { label: 'Select Preset', value: '' },
+                    ...presets.map((preset) => ({
+                      value: preset.name,
+                      label: preset.name,
+                    })),
+                  ]}
                 />
-              </label>
-              <Select
-                label="Load Preset"
-                value={selectedPreset}
-                onChange={handleLoadPreset}
-                options={[
-                  { label: 'Select preset', value: '' },
-                  ...presets.map((preset) => ({
-                    value: preset.name,
-                    label: preset.name,
-                  })),
-                ]}
-              />
+              </div>
             </div>
-          </Panel>
-        </div>
 
-        <div className="min-w-0 space-y-6">
-          <Panel title="Terminal" description="Command preview and live output in one place.">
-            <div className="crystal-item squircle min-w-0 overflow-hidden">
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-2 text-xs text-white/60">
-                <span>Command</span>
-                <span className="glass-pill">Live</span>
+          </div>
+
+          {/* RIGHT COLUMN: Output & Execution Zone */}
+          <div className="p-6 bg-slate-950/45 border-l border-white/5 flex flex-col justify-between space-y-6 overflow-y-auto h-full scrollbar-thin min-h-0">
+            
+            {/* Terminal Preview & Output Logs */}
+            <div className="flex-grow flex flex-col min-h-[300px]">
+              <div className="section-label mb-2">
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <CommandLineIcon className="h-3.5 w-3.5" />
+                  Command Preview & Logs
+                </span>
               </div>
-              <pre className="terminal-text min-w-0 overflow-x-auto px-4 py-4 text-sm text-cyan-200/90">
-                <code>{command}</code>
-              </pre>
+              
+              <div className="terminal-wrap bg-slate-950/65 border border-white/5 rounded-2xl overflow-hidden flex flex-col flex-grow">
+                {/* Tab Header bar */}
+                <div className="terminal-header bg-black/40 border-b border-white/5 px-4 py-2 flex items-center justify-between">
+                  <div className="terminal-title text-[10px] font-semibold text-white/45 flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 rounded-full ${loading ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
+                    <span>{terminalTab === 'command' ? 'ROBOCOPY.EXE COMMAND' : 'LIVE OUTPUT LOGS'}</span>
+                  </div>
+                  <div className="flex bg-slate-900 border border-white/5 rounded-lg p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setTerminalTab('command')}
+                      className={`text-[10px] px-2.5 py-1 rounded-md font-semibold transition-all ${
+                        terminalTab === 'command'
+                          ? 'bg-blue-600/25 text-blue-200 shadow-sm border border-blue-500/20'
+                          : 'text-white/40 hover:text-white/70 border border-transparent'
+                      }`}
+                    >
+                      Command
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTerminalTab('output')}
+                      className={`text-[10px] px-2.5 py-1 rounded-md font-semibold transition-all ${
+                        terminalTab === 'output'
+                          ? 'bg-blue-600/25 text-blue-200 shadow-sm border border-blue-500/20'
+                          : 'text-white/40 hover:text-white/70 border border-transparent'
+                      }`}
+                    >
+                      Output
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Terminal Body */}
+                <div className="terminal-body p-4 font-mono text-xs flex-grow overflow-y-auto max-h-[360px] min-h-[200px] bg-slate-950/40">
+                  {terminalTab === 'command' ? (
+                    <div className="cmd-line text-blue-400 break-all leading-relaxed">
+                      <span className="text-white/20 select-none mr-2">&gt;</span>{command}
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {logs.length === 0 ? (
+                        <p className="text-white/30 italic text-center py-12">Waiting for Robocopy execution...</p>
+                      ) : (
+                        highlightedLines.map((line, idx) => (
+                          <p key={idx} className={`leading-relaxed whitespace-pre-wrap break-all ${line.className || ''}`}>
+                            {line.text}
+                          </p>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-            {showLogs ? (
-              <div className="mt-4">
-                <ConsoleOutput lines={logs} highlightedLines={highlightedLines} />
-              </div>
-            ) : null}
-          </Panel>
 
-          <Panel
-            title="Run & Progress"
-            description="Execute Robocopy and watch progress live."
-            actions={
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" onClick={() => setShowLogs((prev) => !prev)}>
-                  {showLogs ? 'Hide Logs' : 'Show Logs'}
-                </Button>
-                <Button onClick={handleRun} disabled={loading}>
-                  {loading ? <Spinner /> : <PlayIcon className="h-5 w-5" />}
-                  {loading ? 'Running...' : 'Run Robocopy'}
-                </Button>
+            {/* Run & Progress Dashboard */}
+            <div className="space-y-4">
+              <div className="section-label">
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <PlayIcon className="h-3.5 w-3.5" />
+                  Execution & Progress
+                </span>
               </div>
-            }
-          >
-            <div className="grid gap-4">
-              <StatusIndicator status={status} progress={progress} indeterminate={scanning} />
-              <div className="crystal-item squircle grid gap-2 p-4 text-xs text-white/60">
+              
+              <div className="crystal-shell p-5 rounded-2xl border border-white/5 space-y-4 bg-slate-950/10">
                 <div className="flex items-center justify-between">
-                  <span>Mode</span>
-                  <span className="text-white/80">{move ? 'Move' : 'Copy'}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Speed</span>
-                  <span className="text-white/80">{speedText}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>ETA</span>
-                  <span className="text-white/80">{scanning ? 'Scanning…' : formatEta(etaSeconds)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Copied</span>
-                  <span className="text-white/80">
-                    {formatBytes(copiedBytes)} / {totalBytes ? formatBytes(totalBytes) : '—'}
+                  <span className="text-xs font-semibold text-white/50">Current Status</span>
+                  <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                    status === 'completed'
+                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                      : status === 'running'
+                        ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20 animate-pulse'
+                        : status === 'verifying'
+                          ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20 animate-pulse'
+                          : status === 'error'
+                            ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                            : 'bg-white/5 text-white/40 border border-white/5'
+                  }`}>
+                    ● {status}
                   </span>
                 </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="flex items-center gap-2">
-                    <ShieldCheckIcon className="h-4 w-4" />
-                    Verification
-                  </span>
-                  <span className="text-right text-white/80">
-                    {verificationSummary?.skipped
-                      ? 'Skipped'
-                      : verificationSummary
-                        ? `${verificationSummary.checkedFiles || 0}/${verificationSummary.totalFiles || 0} checked`
-                        : verificationMode === 'off'
-                          ? 'Off'
-                          : verificationMode}
-                  </span>
+                
+                {/* Thin progress bar */}
+                <div className="space-y-2">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+                    {scanning ? (
+                      <div className="h-1.5 w-1/3 animate-pulse rounded-full bg-blue-500/70" />
+                    ) : (
+                      <div
+                        className={`h-1.5 rounded-full transition-all duration-500 bg-gradient-to-r ${
+                          status === 'completed'
+                            ? 'from-emerald-500 to-teal-400'
+                            : status === 'error'
+                              ? 'from-rose-500 to-red-400'
+                              : 'from-blue-600 via-indigo-600 to-violet-600'
+                        }`}
+                        style={{ width: `${progress}%` }}
+                      />
+                    )}
+                  </div>
+                  <div className="flex justify-between text-[10px] text-white/40 font-medium">
+                    <span>{scanning ? 'Scanning directories...' : `${progress}% complete`}</span>
+                    <span>{highSpeedRunning ? 'High-Speed metrics hidden' : copiedText}</span>
+                  </div>
                 </div>
-                {verificationSummary && !verificationSummary.skipped ? (
-                  <div className="flex items-center justify-between gap-4">
-                    <span>Integrity failures</span>
-                    <span className={verificationSummary.failedFiles > 0 ? 'text-rose-300' : 'text-emerald-300'}>
-                      {verificationSummary.failedFiles || 0}
+                
+                {/* Mode chips / metadata */}
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-white/60 pt-2 border-t border-white/5">
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-white/40">Mode:</span>
+                    <span className="font-semibold text-white/80">{move ? 'Move' : 'Copy'}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-white/40">Speed:</span>
+                    <span className="font-semibold text-white/80">{speedText}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-white/40">ETA:</span>
+                    <span className="font-semibold text-white/80">{etaText}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-white/40">Verification:</span>
+                    <span className="font-semibold text-white/80">
+                      {verificationSummary?.skipped
+                        ? 'Skipped'
+                        : verificationSummary
+                          ? `${verificationSummary.checkedFiles}/${verificationSummary.totalFiles}`
+                          : verificationMode === 'off'
+                            ? 'Off'
+                            : verificationMode.charAt(0).toUpperCase() + verificationMode.slice(1)}
                     </span>
                   </div>
-                ) : null}
+                </div>
+
+                {verificationSummary && !verificationSummary.skipped && verificationSummary.failedFiles > 0 && (
+                  <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-2.5 text-xs text-rose-300 flex items-center justify-between">
+                    <span>Integrity Failures:</span>
+                    <span className="font-bold">{verificationSummary.failedFiles}</span>
+                  </div>
+                )}
+                
+                {/* Big full-width Run Button */}
+                <button
+                  type="button"
+                  onClick={handleRun}
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-all duration-300 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-500 hover:via-indigo-500 hover:to-violet-500 text-white border border-white/10 shadow-[0_4px_20px_rgba(99,102,241,0.3)] hover:shadow-[0_8px_30px_rgba(99,102,241,0.5)] active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {loading ? (
+                    <Spinner />
+                  ) : (
+                    <PlayIcon className="h-4 w-4" />
+                  )}
+                  {loading ? 'Executing Robocopy...' : 'Run Robocopy'}
+                </button>
               </div>
             </div>
-          </Panel>
+
+          </div>
+
         </div>
+
       </div>
 
-      {helpOpen ? (
+      {/* Hidden file pickers */}
+      <input
+        ref={sourcePickerRef}
+        type="file"
+        className="hidden"
+        webkitdirectory="true"
+        directory="true"
+        onChange={(event) => handleFolderChange(event, setSource)}
+      />
+      <input
+        ref={destinationPickerRef}
+        type="file"
+        className="hidden"
+        webkitdirectory="true"
+        directory="true"
+        onChange={(event) => handleFolderChange(event, setDestination)}
+      />
+
+      {/* Help Overlay Drawer */}
+      {helpOpen && (
         <div className="fixed inset-0 z-50">
           <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
             onClick={() => setHelpOpen(false)}
           />
           <div className="absolute right-4 top-4 bottom-4 w-full max-w-md">
-            <div className="crystal-shell squircle h-full overflow-hidden p-6">
+            <div className="crystal-shell squircle h-full overflow-hidden p-6 border border-white/10 bg-slate-950/80">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-white/50">Help Guide</p>
+                  <p className="text-[10px] uppercase tracking-[0.2rem] text-blue-400 font-bold">Help Guide</p>
                   <h2 className="text-lg font-semibold text-white">Robocopy Quick Tips</h2>
                 </div>
-                <button type="button" className="glass-btn" onClick={() => setHelpOpen(false)}>
+                <button type="button" className="glass-btn px-2.5 py-1.5" onClick={() => setHelpOpen(false)}>
                   <XMarkIcon className="h-5 w-5" />
                 </button>
               </div>
               <div className="mt-6 space-y-4 overflow-y-auto pr-2" style={{ maxHeight: 'calc(100% - 80px)' }}>
                 {HELP_ITEMS.map((item) => (
-                  <div key={item.title} className="crystal-item squircle p-4">
+                  <div key={item.title} className="crystal-item squircle p-4 border border-white/5 bg-white/5">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-semibold text-white">{item.title}</p>
-                      <span className="glass-pill">{item.flag}</span>
+                      <span className="glass-pill text-[10px] px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 font-semibold">{item.flag}</span>
                     </div>
-                    <p className="mt-2 text-xs text-white/60">{item.desc}</p>
+                    <p className="mt-2 text-xs text-white/50 leading-relaxed">{item.desc}</p>
                   </div>
                 ))}
               </div>
             </div>
           </div>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
