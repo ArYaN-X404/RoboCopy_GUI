@@ -2,16 +2,22 @@
   "name": "robocopy-gui",
   "private": true,
   "version": "0.1.0",
+  "description": "Modern Robocopy GUI for Windows with drag-drop, presets, and live logs.",
+  "author": "Aryan",
   "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently -k \"vite\" \"wait-on http://localhost:5173 && set VITE_DEV_SERVER_URL=http://localhost:5173&& electron .\"",
-    "build": "vite build && electron-builder -w portable",
+    "build": "vite build",
+    "dist": "npm run build && electron-builder -w portable nsis",
+    "dist:portable": "npm run build && electron-builder -w portable",
+    "dist:installer": "npm run build && electron-builder -w nsis",
     "preview": "vite preview"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "xxhash-wasm": "^1.1.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
@@ -27,9 +33,13 @@
   "build": {
     "appId": "com.robocopy.pro",
     "productName": "RoboCopy Pro",
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "dist/**",
       "electron/**",
+      "node_modules/xxhash-wasm/**",
       "package.json"
     ],
     "extraMetadata": {
@@ -42,9 +52,23 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
         }
-      ],
-      "artifactName": "RoboCopy-Pro-Portable-${version}.exe"
+      ]
+    },
+    "portable": {
+      "artifactName": "RoboCopy-Pro-Portable-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "include": "build/installer.nsh",
+      "artifactName": "RoboCopy-Pro-Setup-${version}.${ext}"
     }
   }
 }

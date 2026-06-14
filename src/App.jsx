@@ -6,6 +6,7 @@ import {
   MinusIcon,
   MoonIcon,
   PlayIcon,
+  ShieldCheckIcon,
   Square2StackIcon,
   SunIcon,
   XMarkIcon,
@@ -34,6 +35,7 @@ const INITIAL_PRESET = {
   highSpeed: false,
   excludeText: '',
   copyMode: 'copy',
+  verificationMode: 'balanced',
 };
 
 const PRESET_STORAGE_KEY = 'robocopy-gui-presets';
@@ -47,6 +49,13 @@ const HELP_ITEMS = [
   { title: 'Logging', flag: '/LOG', desc: 'Writes a log file for every run.' },
   { title: 'Exclude Filters', flag: '/XD /XF', desc: 'Skip folders or files like node_modules or *.tmp.' },
   { title: 'High Speed', flag: '/NFL /NDL /NP', desc: 'Cuts console output for maximum throughput.' },
+];
+
+const VERIFICATION_MODES = [
+  { value: 'off', label: 'Off - skip integrity checks' },
+  { value: 'fast', label: 'Fast - size and modified time' },
+  { value: 'balanced', label: 'Balanced - full small-file hash, sampled large-file hash' },
+  { value: 'strict', label: 'Strict - full hash every file' },
 ];
 
 function loadPresets() {
@@ -85,6 +94,16 @@ function formatEta(seconds) {
   const hours = Math.floor(mins / 60);
   const remMins = mins % 60;
   return `${hours}h ${remMins}m`;
+}
+
+function formatDuration(seconds) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '0s';
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  if (hours > 0) return `${hours}h ${mins}m ${secs}s`;
+  if (mins > 0) return `${mins}m ${secs}s`;
+  return `${secs}s`;
 }
 
 function sanitizePath(input) {
@@ -126,6 +145,7 @@ export default function App() {
   const [highSpeed, setHighSpeed] = useState(INITIAL_PRESET.highSpeed);
   const [excludeText, setExcludeText] = useState(INITIAL_PRESET.excludeText);
   const [copyMode, setCopyMode] = useState(INITIAL_PRESET.copyMode);
+  const [verificationMode, setVerificationMode] = useState(INITIAL_PRESET.verificationMode);
   const [status, setStatus] = useState('idle');
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState([]);
@@ -138,14 +158,15 @@ export default function App() {
   const [speedBps, setSpeedBps] = useState(0);
   const [etaSeconds, setEtaSeconds] = useState(null);
   const [scanning, setScanning] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [verificationSummary, setVerificationSummary] = useState(null);
 
-  const speedRef = useRef(0);
   const totalBytesRef = useRef(0);
   const copiedBytesRef = useRef(0);
+  const runStartedAtRef = useRef(null);
   const sourcePickerRef = useRef(null);
   const destinationPickerRef = useRef(null);
   const runTimerRef = useRef(null);
-  const progressTimerRef = useRef(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
@@ -171,22 +192,15 @@ export default function App() {
   }, [highSpeed, resume, logging, retries, wait, threads]);
 
   useEffect(() => {
-    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-    progressTimerRef.current = setInterval(() => {
-      if (totalBytesRef.current <= 0) return;
-      const pct = Math.min(100, Math.round((copiedBytesRef.current / totalBytesRef.current) * 100));
-      setProgress(pct);
-      if (window?.robocopy?.setProgress) window.robocopy.setProgress(pct / 100);
-      const speed = speedRef.current;
-      if (speed > 0) {
-        setEtaSeconds(Math.max(0, Math.round((totalBytesRef.current - copiedBytesRef.current) / speed)));
-      }
-    }, 120);
+    if (!loading) return undefined;
+    if (!runStartedAtRef.current) runStartedAtRef.current = Date.now();
 
-    return () => {
-      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-    };
-  }, []);
+    const timer = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - runStartedAtRef.current) / 1000));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [loading]);
 
   const command = useMemo(
     () =>
@@ -306,6 +320,7 @@ export default function App() {
         highSpeed,
         excludeText,
         copyMode,
+        verificationMode,
       },
     });
     setPresets(next);
@@ -331,29 +346,7 @@ export default function App() {
     setHighSpeed(Boolean(data.highSpeed));
     setExcludeText(data.excludeText ?? '');
     setCopyMode(data.copyMode ?? 'copy');
-  };
-
-  const parseSpeed = (line) => {
-    const match = line.match(/Speed\s*:\s*([\d,]+)\s*Bytes\/sec/i);
-    if (!match) return;
-    const value = Number(match[1].replace(/,/g, ''));
-    if (Number.isFinite(value)) {
-      speedRef.current = value;
-      setSpeedBps(value);
-    }
-  };
-
-  const parseFileSize = (line) => {
-    if (!/(New File|Newer|Older|Same)/i.test(line)) return 0;
-    const bytesMatch = line.match(/(?:New File|Newer|Older|Same)\s+(\d{1,12})\s/i);
-    if (!bytesMatch) return 0;
-    const bytes = Number(bytesMatch[1].replace(/,/g, ''));
-    return Number.isFinite(bytes) ? bytes : 0;
-  };
-
-  const updateProgressFromBytes = (addedBytes) => {
-    copiedBytesRef.current += addedBytes;
-    setCopiedBytes(copiedBytesRef.current);
+    setVerificationMode(data.verificationMode ?? 'balanced');
   };
 
   const simulateRun = () => {
@@ -397,16 +390,23 @@ export default function App() {
       setStatus('running');
       setProgress(0);
       setLoading(true);
-      setLogs([command]);
+      setLogs([
+        command,
+        highSpeed
+          ? 'High-Speed Mode is active. Detailed live speed, ETA, and file tracking are suppressed by Robocopy for maximum throughput.'
+          : 'Robocopy started. Live speed is calculated from transfer progress.',
+      ]);
       setCopiedBytes(0);
       setTotalBytes(0);
       setSpeedBps(0);
       setEtaSeconds(null);
-      speedRef.current = 0;
+      setElapsedSeconds(0);
+      setVerificationSummary(null);
+      runStartedAtRef.current = Date.now();
       totalBytesRef.current = 0;
       copiedBytesRef.current = 0;
 
-      if (window?.robocopy?.getFolderSize) {
+      if (!highSpeed && window?.robocopy?.getFolderSize) {
         setScanning(true);
         try {
           const size = await window.robocopy.getFolderSize(source);
@@ -428,18 +428,88 @@ export default function App() {
         await window.robocopy.run({
           command,
           args: robocopyArgs,
+          source,
+          destination,
+          subdirMode,
+          excludeText,
+          move,
+          verificationMode,
+          verificationThreads: Math.min(8, Math.max(2, threads)),
           onProgress: (nextProgress, line) => {
             if (line) {
-              parseSpeed(line);
-              const addedBytes = parseFileSize(line);
-              if (addedBytes > 0) {
-                updateProgressFromBytes(addedBytes);
-              }
               setLogs((prev) => [...prev, line]);
             }
             if (Number.isFinite(nextProgress) && totalBytesRef.current === 0) {
               setProgress(nextProgress);
               if (window?.robocopy?.setProgress) window.robocopy.setProgress(nextProgress / 100);
+            }
+          },
+          onMetrics: (metrics) => {
+            const nextCopiedBytes = Number(metrics?.copiedBytes);
+            const nextSpeedBps = Number(metrics?.speedBps);
+
+            if (Number.isFinite(nextCopiedBytes)) {
+              copiedBytesRef.current = nextCopiedBytes;
+              setCopiedBytes(nextCopiedBytes);
+            }
+
+            if (Number.isFinite(nextSpeedBps)) {
+              setSpeedBps(nextSpeedBps);
+            }
+
+            if (totalBytesRef.current > 0 && Number.isFinite(nextCopiedBytes)) {
+              const nextProgress = Math.min(100, Math.round((nextCopiedBytes / totalBytesRef.current) * 100));
+              setProgress(nextProgress);
+              if (window?.robocopy?.setProgress) window.robocopy.setProgress(nextProgress / 100);
+
+              if (nextSpeedBps > 0) {
+                setEtaSeconds(Math.max(0, Math.round((totalBytesRef.current - nextCopiedBytes) / nextSpeedBps)));
+              }
+            }
+          },
+          onVerification: (event) => {
+            const summary = event?.summary;
+            if (event?.type === 'started') {
+              setStatus('verifying');
+              setProgress(0);
+              setVerificationSummary(summary);
+              setLogs((prev) => [
+                ...prev,
+                `Verification started: ${summary.mode} mode, ${summary.totalFiles} files.`,
+              ]);
+              return;
+            }
+
+            if (event?.type === 'progress' && summary) {
+              setStatus('verifying');
+              setVerificationSummary(summary);
+              const nextProgress =
+                summary.totalBytes > 0
+                  ? Math.min(100, Math.round((summary.verifiedBytes / summary.totalBytes) * 100))
+                  : summary.totalFiles > 0
+                    ? Math.min(100, Math.round((summary.checkedFiles / summary.totalFiles) * 100))
+                    : 100;
+              setProgress(nextProgress);
+              if (window?.robocopy?.setProgress) window.robocopy.setProgress(nextProgress / 100);
+              return;
+            }
+
+            if (event?.type === 'done' && summary) {
+              setVerificationSummary(summary);
+              if (summary.skipped) {
+                setLogs((prev) => [...prev, `Verification skipped: ${summary.reason}`]);
+              } else {
+                setLogs((prev) => [
+                  ...prev,
+                  `Verification ${summary.failedFiles > 0 ? 'failed' : 'passed'}: ${summary.checkedFiles} checked, ${summary.failedFiles} failed.`,
+                ]);
+              }
+              setProgress(100);
+              return;
+            }
+
+            if (event?.type === 'error') {
+              setLogs((prev) => [...prev, event.error?.message || 'Verification failed.']);
             }
           },
         });
@@ -451,6 +521,7 @@ export default function App() {
         setLogs((prev) => [...prev, error?.message || 'Run failed.']);
       } finally {
         setLoading(false);
+        runStartedAtRef.current = null;
       }
       return;
     }
@@ -458,7 +529,16 @@ export default function App() {
     simulateRun();
   };
 
-  const speedText = speedBps > 0 ? `${formatBytes(speedBps)}/s` : '—';
+  const highSpeedRunning = highSpeed && loading;
+  const speedText = highSpeedRunning ? 'Optimized mode' : speedBps > 0 ? `${formatBytes(speedBps)}/s` : '—';
+  const etaText = highSpeedRunning
+    ? 'Unavailable in high-speed mode'
+    : scanning
+      ? 'Scanning...'
+      : formatEta(etaSeconds);
+  const copiedText = highSpeedRunning
+    ? 'Tracking disabled for maximum speed'
+    : `${formatBytes(copiedBytes)} / ${totalBytes ? formatBytes(totalBytes) : '—'}`;
   const highlightedLines = useMemo(() => logs.slice(-400).map(highlightLine), [logs]);
 
   return (
@@ -588,6 +668,14 @@ export default function App() {
                     value: mode.id,
                     label: `${mode.label} — ${mode.description}`,
                   }))}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Select
+                  label="Verification"
+                  value={verificationMode}
+                  onChange={setVerificationMode}
+                  options={VERIFICATION_MODES}
                 />
               </div>
               <Toggle
@@ -785,6 +873,29 @@ export default function App() {
                     {formatBytes(copiedBytes)} / {totalBytes ? formatBytes(totalBytes) : '—'}
                   </span>
                 </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="flex items-center gap-2">
+                    <ShieldCheckIcon className="h-4 w-4" />
+                    Verification
+                  </span>
+                  <span className="text-right text-white/80">
+                    {verificationSummary?.skipped
+                      ? 'Skipped'
+                      : verificationSummary
+                        ? `${verificationSummary.checkedFiles || 0}/${verificationSummary.totalFiles || 0} checked`
+                        : verificationMode === 'off'
+                          ? 'Off'
+                          : verificationMode}
+                  </span>
+                </div>
+                {verificationSummary && !verificationSummary.skipped ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <span>Integrity failures</span>
+                    <span className={verificationSummary.failedFiles > 0 ? 'text-rose-300' : 'text-emerald-300'}>
+                      {verificationSummary.failedFiles || 0}
+                    </span>
+                  </div>
+                ) : null}
               </div>
             </div>
           </Panel>

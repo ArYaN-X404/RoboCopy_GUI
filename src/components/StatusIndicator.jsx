@@ -1,7 +1,13 @@
-﻿export default function StatusIndicator({ status, progress, indeterminate }) {
+export default function StatusIndicator({
+  status,
+  progress,
+  indeterminate,
+  indeterminateLabel = 'Calculating transfer size...',
+}) {
   const statusMap = {
     idle: 'Idle',
     running: 'Running',
+    verifying: 'Verifying',
     completed: 'Completed',
     error: 'Error',
   };
@@ -9,6 +15,7 @@
   const colorMap = {
     idle: 'bg-white/20',
     running: 'bg-cyan-400/70',
+    verifying: 'bg-violet-400/70',
     completed: 'bg-emerald-400/70',
     error: 'bg-rose-500/70',
   };
@@ -30,7 +37,7 @@
         )}
       </div>
       <p className="text-xs text-white/60">
-        {indeterminate ? 'Calculating transfer size…' : `${progress}% complete`}
+        {indeterminate ? indeterminateLabel : `${progress}% complete`}
       </p>
     </div>
   );

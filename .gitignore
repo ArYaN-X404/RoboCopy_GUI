@@ -3,3 +3,5 @@ dist/
 robocopy.log
 *.log
 chrome-profile/
+build/
+release/
