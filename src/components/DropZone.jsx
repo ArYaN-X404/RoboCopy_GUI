@@ -9,16 +9,16 @@ const ICONS = {
 export default function DropZone({ label, description, value, onDropPath, onBrowse, kind }) {
   const [active, setActive] = useState(false);
   const Icon = kind ? ICONS[kind] : null;
-  const displayText = active ? `Drop to set as ${label}` : value || 'Drop a folder here';
+  const displayText = active ? `Drop to set as ${label}` : value || 'Drop or browse a folder…';
 
   return (
     <div
-      className={`crystal-item squircle relative flex min-h-[250px] min-w-0 flex-col justify-between gap-4 p-6 text-center transition duration-300 ${
+      className={`folder-card flex flex-col justify-between min-h-[220px] transition duration-300 ${
         active
           ? kind === 'source'
-            ? 'border-blue-500/50 shadow-[0_0_25px_rgba(59,130,246,0.15)] scale-[1.01]'
-            : 'border-emerald-500/50 shadow-[0_0_25px_rgba(16,185,129,0.15)] scale-[1.01]'
-          : 'hover:border-white/15'
+            ? 'border-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,0.15)] scale-[1.01]'
+            : 'border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.15)] scale-[1.01]'
+          : ''
       }`}
       onDragEnter={(event) => {
         event.preventDefault();
@@ -40,68 +40,36 @@ export default function DropZone({ label, description, value, onDropPath, onBrow
       tabIndex={0}
     >
       {/* Top accent bar */}
-      <div
-        className={`absolute top-0 left-0 right-0 h-1 rounded-t-[28px] ${
-          kind === 'source'
-            ? 'bg-gradient-to-r from-blue-500 to-cyan-400'
-            : 'bg-gradient-to-r from-emerald-500 to-teal-400'
-        }`}
-      />
+      <div className={`fc-accent ${kind === 'source' ? 'fca-blue' : 'fca-green'}`} />
 
-      <div className="space-y-3 pt-2">
-        <div className="flex items-center justify-center gap-2 text-sm font-semibold text-white">
+      <div>
+        {/* Header section with Icon, Title and Subtitle */}
+        <div className="fc-header">
+          <div className={`fc-iconbg ${kind === 'source' ? 'fci-blue' : 'fci-green'}`}>
+            {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
+          </div>
+          <div>
+            <div className="fc-title">{label}</div>
+            <div className="fc-sub">{description}</div>
+          </div>
+        </div>
+
+        {/* Path container */}
+        <div className="fc-path" onClick={onBrowse}>
           {Icon ? (
-            <Icon
-              className={`h-5 w-5 ${
-                kind === 'source' ? 'text-blue-400' : 'text-emerald-400'
-              }`}
-            />
+            <Icon className={`h-4 w-4 flex-shrink-0 ${kind === 'source' ? 'text-blue-500/60' : 'text-emerald-500/60'}`} />
           ) : null}
-          <span>{label}</span>
-        </div>
-        <p className="text-xs text-white/50">{description}</p>
-      </div>
-
-      <div className="min-w-0 space-y-4">
-        {Icon ? (
-          <Icon
-            className={`mx-auto h-12 w-12 transition-transform duration-300 ${
-              active ? 'scale-110' : 'scale-100'
-            } ${
-              kind === 'source'
-                ? 'text-blue-400/70 drop-shadow-[0_0_8px_rgba(59,130,246,0.3)]'
-                : 'text-emerald-400/70 drop-shadow-[0_0_8px_rgba(16,185,129,0.3)]'
-            }`}
-          />
-        ) : null}
-
-        <div
-          className={`min-w-0 rounded-xl border border-dashed px-3 py-3 text-xs transition duration-200 ${
-            active
-              ? kind === 'source'
-                ? 'border-blue-400/50 bg-blue-500/5 text-blue-200'
-                : 'border-emerald-400/50 bg-emerald-500/5 text-emerald-200'
-              : 'border-white/10 bg-white/5 text-white/70 hover:border-white/20'
-          }`}
-        >
-          <p className="truncate font-medium" title={displayText}>
+          <div className={`fc-path-text truncate ${value ? 'text-slate-300 not-italic font-medium' : ''}`}>
             {displayText}
-          </p>
+          </div>
         </div>
-
-        <button
-          type="button"
-          className={`glass-btn w-full transition duration-150 ${
-            kind === 'source'
-              ? 'hover:border-blue-400/50 hover:bg-blue-500/10'
-              : 'hover:border-emerald-400/50 hover:bg-emerald-500/10'
-          }`}
-          onClick={onBrowse}
-        >
-          <ArrowDownTrayIcon className="h-4 w-4" />
-          Browse folder
-        </button>
       </div>
+
+      {/* Browse Button */}
+      <button type="button" className="browse-btn" onClick={onBrowse}>
+        <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+        <span>Browse folder</span>
+      </button>
     </div>
   );
 }

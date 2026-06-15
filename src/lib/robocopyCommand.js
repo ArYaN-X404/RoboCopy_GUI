@@ -1,4 +1,4 @@
-﻿export const COPY_MODES = [
+export const COPY_MODES = [
   { id: 'copy', label: 'Copy', description: 'Standard copy without deletes.' },
   { id: 'sync', label: 'Sync', description: 'Mirror source and destination.' },
   { id: 'custom', label: 'Custom', description: 'Use the toggles below.' },
@@ -78,8 +78,7 @@ export function buildRobocopyArgs({
 export function buildRobocopyCommand(options) {
   const safeSource = options.source ? `"${options.source}"` : '"<source>"';
   const safeDestination = options.destination ? `"${options.destination}"` : '"<destination>"';
-  const args = buildRobocopyArgs(options);
-  const flags = args.slice(2);
+  const flags = buildRobocopyArgs({ ...options, source: '', destination: '' });
 
   return ['robocopy', safeSource, safeDestination, ...flags].join(' ');
 }
