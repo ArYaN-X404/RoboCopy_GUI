@@ -5,3 +5,6 @@ robocopy.log
 chrome-profile/
 build/
 release/
+backup/
+Robo/
+back*

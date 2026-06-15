@@ -1,4 +1,4 @@
-﻿export default function ConsoleOutput({ lines, highlightedLines }) {
+export default function ConsoleOutput({ lines, highlightedLines }) {
   return (
     <div className="terminal-surface h-64 min-w-0 overflow-hidden rounded-2xl">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-2">
@@ -7,7 +7,10 @@
       </div>
       <div className="terminal-text h-[calc(100%-40px)] overflow-y-auto overflow-x-auto px-4 py-3 text-xs">
         {lines.length === 0 ? (
-          <p className="text-white/50">Waiting for run...</p>
+          <div className="flex items-center gap-1.5 font-mono text-cyan-200/60 select-none">
+            <span>&gt; Ready. Waiting for Robocopy execution</span>
+            <span className="w-1.5 h-3.5 bg-cyan-400 animate-blink" />
+          </div>
         ) : (
           (highlightedLines || lines).map((line, index) => (
             <p

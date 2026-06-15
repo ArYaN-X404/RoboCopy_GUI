@@ -1,10 +1,91 @@
-﻿const { app, BrowserWindow, dialog, ipcMain, Notification } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Notification } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs/promises');
 const { verifyCopy } = require('./verification/verifyManager');
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
+
+let mainWindow = null;
+let initialPaths = { source: '', destination: '' };
+
+const debugLogPath = 'C:\\Users\\Aryan\\Documents\\GitHub\\RoboCopy_GUI\\debug_argv.log';
+try {
+  require('fs').appendFileSync(debugLogPath, `[${new Date().toISOString()}] START: ${JSON.stringify(process.argv)}\n`);
+} catch (e) {}
+
+function parseArgs(argv) {
+  let source = '';
+  let destination = '';
+
+  function isValidPath(str) {
+    if (!str) return false;
+    if (str.startsWith('-')) return false;
+    if (str === '.' || str.includes('node_modules')) return false;
+    return /^[A-Za-z]:\\/.test(str) || path.isAbsolute(str);
+  }
+
+  for (let i = 1; i < argv.length; i++) {
+    const arg = argv[i];
+    if (!arg) continue;
+
+    if (arg === '--source') {
+      if (i + 1 < argv.length) {
+        const nextVal = argv[i + 1];
+        if (isValidPath(nextVal)) {
+          source = nextVal;
+          i++;
+        }
+      }
+    } else if (arg === '--destination') {
+      if (i + 1 < argv.length) {
+        const nextVal = argv[i + 1];
+        if (isValidPath(nextVal)) {
+          destination = nextVal;
+          i++;
+        }
+      }
+    } else if (arg.startsWith('-')) {
+      continue;
+    } else {
+      if (isValidPath(arg)) {
+        if (!source) {
+          source = arg;
+        } else if (!destination) {
+          destination = arg;
+        }
+      }
+    }
+  }
+
+  return { source, destination };
+}
+
+// Parse initial arguments at startup
+initialPaths = parseArgs(process.argv);
+
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    try {
+      require('fs').appendFileSync(debugLogPath, `[${new Date().toISOString()}] SECOND-INSTANCE: ${JSON.stringify(commandLine)}\n`);
+    } catch (e) {}
+    // Focus existing window
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+
+      // Parse arguments from second instance and forward to primary window
+      const parsed = parseArgs(commandLine);
+      if (parsed.source || parsed.destination) {
+        mainWindow.webContents.send('robocopy:set-paths', parsed);
+      }
+    }
+  });
+}
 
 async function resolveRobocopyArgs(args) {
   const logDir = path.join(app.getPath('userData'), 'logs');
@@ -157,7 +238,8 @@ function createRobocopyStreamHandler({ window, metrics, streamName }) {
 }
 
 async function getFolderSize(rootPath) {
-  let total = 0;
+  let totalBytes = 0;
+  let totalFiles = 0;
   const stack = [rootPath];
 
   while (stack.length > 0) {
@@ -176,7 +258,8 @@ async function getFolderSize(rootPath) {
       } else if (entry.isFile()) {
         try {
           const stat = await fs.stat(fullPath);
-          total += stat.size;
+          totalBytes += stat.size;
+          totalFiles += 1;
         } catch {
           // Ignore unreadable files.
         }
@@ -184,11 +267,11 @@ async function getFolderSize(rootPath) {
     }
   }
 
-  return total;
+  return { totalBytes, totalFiles };
 }
 
 function createWindow() {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1260,
     height: 820,
     minWidth: 980,
@@ -233,8 +316,12 @@ ipcMain.handle('robocopy:select-folder', async () => {
   return result.filePaths[0];
 });
 
+ipcMain.handle('robocopy:get-initial-paths', () => {
+  return initialPaths;
+});
+
 ipcMain.handle('robocopy:folder-size', async (_event, folderPath) => {
-  if (!folderPath) return 0;
+  if (!folderPath) return { totalBytes: 0, totalFiles: 0 };
   return getFolderSize(folderPath);
 });
 

@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { ArrowDownTrayIcon, FolderOpenIcon, InboxArrowDownIcon } from '@heroicons/react/24/outline';
 
 const ICONS = {
@@ -9,12 +9,16 @@ const ICONS = {
 export default function DropZone({ label, description, value, onDropPath, onBrowse, kind }) {
   const [active, setActive] = useState(false);
   const Icon = kind ? ICONS[kind] : null;
-  const displayText = active ? `Drop to set as ${label}` : value || 'Drop a folder here';
+  const displayText = active ? `Drop to set as ${label}` : value || 'Drop or browse a folder…';
 
   return (
     <div
-      className={`crystal-item squircle relative flex min-h-[240px] min-w-0 flex-col justify-between gap-4 p-6 text-center transition ${
-        active ? 'drop-magnet' : ''
+      className={`folder-card flex flex-col justify-between min-h-[220px] transition duration-300 ${
+        active
+          ? kind === 'source'
+            ? 'border-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,0.15)] scale-[1.01]'
+            : 'border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.15)] scale-[1.01]'
+          : ''
       }`}
       onDragEnter={(event) => {
         event.preventDefault();
@@ -35,25 +39,37 @@ export default function DropZone({ label, description, value, onDropPath, onBrow
       }}
       tabIndex={0}
     >
-      <div className="space-y-3">
-        <div className="flex items-center justify-center gap-2 text-sm font-semibold text-white">
-          {Icon ? <Icon className="h-5 w-5 text-cyan-200" /> : null}
-          <span>{label}</span>
+      {/* Top accent bar */}
+      <div className={`fc-accent ${kind === 'source' ? 'fca-blue' : 'fca-green'}`} />
+
+      <div>
+        {/* Header section with Icon, Title and Subtitle */}
+        <div className="fc-header">
+          <div className={`fc-iconbg ${kind === 'source' ? 'fci-blue' : 'fci-green'}`}>
+            {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
+          </div>
+          <div>
+            <div className="fc-title">{label}</div>
+            <div className="fc-sub">{description}</div>
+          </div>
         </div>
-        <p className="text-xs text-white/60">{description}</p>
-      </div>
-      <div className="min-w-0 space-y-4">
-        {Icon ? <Icon className="mx-auto h-12 w-12 text-cyan-200/80" /> : null}
-        <div className="min-w-0 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70">
-          <p className="truncate" title={displayText}>
+
+        {/* Path container */}
+        <div className="fc-path" onClick={onBrowse}>
+          {Icon ? (
+            <Icon className={`h-4 w-4 flex-shrink-0 ${kind === 'source' ? 'text-blue-500/60' : 'text-emerald-500/60'}`} />
+          ) : null}
+          <div className={`fc-path-text truncate ${value ? 'text-slate-300 not-italic font-medium' : ''}`}>
             {displayText}
-          </p>
+          </div>
         </div>
-        <button type="button" className="glass-btn w-full" onClick={onBrowse}>
-          <ArrowDownTrayIcon className="h-4 w-4" />
-          Browse
-        </button>
       </div>
+
+      {/* Browse Button */}
+      <button type="button" className="browse-btn" onClick={onBrowse}>
+        <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+        <span>Browse folder</span>
+      </button>
     </div>
   );
 }

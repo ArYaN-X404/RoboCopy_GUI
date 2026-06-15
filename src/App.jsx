@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDownTrayIcon,
   CommandLineIcon,
@@ -10,6 +10,11 @@ import {
   Square2StackIcon,
   SunIcon,
   XMarkIcon,
+  FolderIcon,
+  ArrowPathIcon,
+  Cog6ToothIcon,
+  BoltIcon,
+  CpuChipIcon,
 } from '@heroicons/react/24/outline';
 import Button from './components/Button.jsx';
 import Panel from './components/Panel.jsx';
@@ -20,6 +25,7 @@ import Spinner from './components/Spinner.jsx';
 import StatusIndicator from './components/StatusIndicator.jsx';
 import DropZone from './components/DropZone.jsx';
 import { buildRobocopyArgs, buildRobocopyCommand, COPY_MODES } from './lib/robocopyCommand.js';
+import logoImg from './assets/logo.png';
 
 const INITIAL_PRESET = {
   source: '',
@@ -127,10 +133,33 @@ function highlightLine(text) {
   return { text, className: '' };
 }
 
+function SectionHeader({ label, icon: Icon, theme = 'blue' }) {
+  const themes = {
+    blue: 'si-blue',
+    green: 'si-green',
+    amber: 'si-amber',
+    purple: 'si-purple',
+    slate: 'bg-white/5 text-white/40',
+  };
+  const themeClass = themes[theme] || themes.blue;
+
+  return (
+    <div className="sec-head select-none">
+      <div className={`sec-icon ${themeClass}`}>
+        <Icon className="h-3 w-3" />
+      </div>
+      <span className="sec-label">{label}</span>
+      <div className="sec-line"></div>
+    </div>
+  );
+}
+
 export default function App() {
   const [darkMode, setDarkMode] = useState(true);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [helpTab, setHelpTab] = useState('general');
   const [showLogs, setShowLogs] = useState(true);
+  const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [source, setSource] = useState(INITIAL_PRESET.source);
   const [destination, setDestination] = useState(INITIAL_PRESET.destination);
@@ -155,11 +184,14 @@ export default function App() {
   const [selectedPreset, setSelectedPreset] = useState('');
   const [totalBytes, setTotalBytes] = useState(0);
   const [copiedBytes, setCopiedBytes] = useState(0);
+  const [totalFiles, setTotalFiles] = useState(0);
+  const [copiedFiles, setCopiedFiles] = useState(0);
   const [speedBps, setSpeedBps] = useState(0);
   const [etaSeconds, setEtaSeconds] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [verificationSummary, setVerificationSummary] = useState(null);
+  const [terminalTab, setTerminalTab] = useState('command');
 
   const totalBytesRef = useRef(0);
   const copiedBytesRef = useRef(0);
@@ -171,6 +203,21 @@ export default function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
   }, [darkMode]);
+
+  useEffect(() => {
+    if (window?.robocopy?.getInitialPaths) {
+      window.robocopy.getInitialPaths().then((paths) => {
+        if (paths?.source) setSource(paths.source);
+        if (paths?.destination) setDestination(paths.destination);
+      });
+    }
+    if (window?.robocopy?.onSetPaths) {
+      return window.robocopy.onSetPaths((paths) => {
+        if (paths?.source) setSource(paths.source);
+        if (paths?.destination) setDestination(paths.destination);
+      });
+    }
+  }, []);
 
   useEffect(() => {
     if (copyMode === 'sync') {
@@ -353,16 +400,20 @@ export default function App() {
     setStatus('running');
     setProgress(0);
     setLoading(true);
+    setTerminalTab('output');
     setLogs([
       `Starting Robocopy session at ${new Date().toLocaleTimeString()}`,
       command,
     ]);
+    setTotalFiles(150);
+    setCopiedFiles(0);
 
     let step = 0;
     if (runTimerRef.current) clearInterval(runTimerRef.current);
     runTimerRef.current = setInterval(() => {
       step += 1;
       setProgress(Math.min(100, step * 12));
+      setCopiedFiles((prev) => Math.min(150, prev + 18));
       setLogs((prev) => [
         ...prev,
         `Copying batch ${step}...`,
@@ -373,6 +424,8 @@ export default function App() {
         setStatus('completed');
         setLoading(false);
         setLogs((prev) => [...prev, 'Completed successfully.']);
+        setProgress(100);
+        setCopiedFiles(150);
       }
     }, 650);
   };
@@ -383,9 +436,11 @@ export default function App() {
       setStatus('error');
       setProgress(0);
       setLogs(['Please provide both Source and Destination folders.']);
+      setTerminalTab('output');
       return;
     }
 
+    setTerminalTab('output');
     if (window?.robocopy?.run) {
       setStatus('running');
       setProgress(0);
@@ -398,6 +453,8 @@ export default function App() {
       ]);
       setCopiedBytes(0);
       setTotalBytes(0);
+      setCopiedFiles(0);
+      setTotalFiles(0);
       setSpeedBps(0);
       setEtaSeconds(null);
       setElapsedSeconds(0);
@@ -409,16 +466,22 @@ export default function App() {
       if (!highSpeed && window?.robocopy?.getFolderSize) {
         setScanning(true);
         try {
-          const size = await window.robocopy.getFolderSize(source);
+          const result = await window.robocopy.getFolderSize(source);
+          const size = typeof result === 'object' ? result.totalBytes : result;
+          const filesCount = typeof result === 'object' ? result.totalFiles : 0;
           setTotalBytes(size);
           totalBytesRef.current = size;
+          setTotalFiles(filesCount);
           setLogs((prev) => [
             ...prev,
-            size > 0 ? `Scan complete: ${formatBytes(size)}` : 'Scan complete: size unavailable.',
+            size > 0 
+              ? `Scan complete: ${formatBytes(size)} (${filesCount.toLocaleString()} files)` 
+              : 'Scan complete: size unavailable.',
           ]);
         } catch {
           setTotalBytes(0);
           totalBytesRef.current = 0;
+          setTotalFiles(0);
         } finally {
           setScanning(false);
         }
@@ -438,6 +501,9 @@ export default function App() {
           onProgress: (nextProgress, line) => {
             if (line) {
               setLogs((prev) => [...prev, line]);
+              if (/\b(New File|Newer|Older)\s+/i.test(line)) {
+                setCopiedFiles((prev) => prev + 1);
+              }
             }
             if (Number.isFinite(nextProgress) && totalBytesRef.current === 0) {
               setProgress(nextProgress);
@@ -473,6 +539,8 @@ export default function App() {
               setStatus('verifying');
               setProgress(0);
               setVerificationSummary(summary);
+              setSpeedBps(0);
+              setEtaSeconds(null);
               setLogs((prev) => [
                 ...prev,
                 `Verification started: ${summary.mode} mode, ${summary.totalFiles} files.`,
@@ -491,6 +559,17 @@ export default function App() {
                     : 100;
               setProgress(nextProgress);
               if (window?.robocopy?.setProgress) window.robocopy.setProgress(nextProgress / 100);
+
+              // Calculate verification speed and ETA
+              const elapsed = Math.max(0.1, (Date.now() - (summary.startedAt || Date.now())) / 1000);
+              const speed = summary.verifiedBytes / elapsed;
+              setSpeedBps(speed);
+              if (speed > 0) {
+                const remainingBytes = Math.max(0, summary.totalBytes - summary.verifiedBytes);
+                setEtaSeconds(remainingBytes / speed);
+              } else {
+                setEtaSeconds(null);
+              }
               return;
             }
 
@@ -530,136 +609,171 @@ export default function App() {
   };
 
   const highSpeedRunning = highSpeed && loading;
-  const speedText = highSpeedRunning ? 'Optimized mode' : speedBps > 0 ? `${formatBytes(speedBps)}/s` : '—';
-  const etaText = highSpeedRunning
-    ? 'Unavailable in high-speed mode'
-    : scanning
-      ? 'Scanning...'
-      : formatEta(etaSeconds);
-  const copiedText = highSpeedRunning
-    ? 'Tracking disabled for maximum speed'
-    : `${formatBytes(copiedBytes)} / ${totalBytes ? formatBytes(totalBytes) : '—'}`;
+  const speedText = status === 'idle'
+    ? '—'
+    : highSpeedRunning
+      ? 'Optimized mode'
+      : speedBps > 0
+        ? `${formatBytes(speedBps)}/s`
+        : '—';
+  const etaText = status === 'idle'
+    ? '—'
+    : highSpeedRunning
+      ? 'Unavailable'
+      : scanning
+        ? 'Scanning...'
+        : formatEta(etaSeconds);
+  const copiedText = status === 'idle'
+    ? '—'
+    : highSpeedRunning
+      ? 'Tracking disabled'
+      : `${formatBytes(copiedBytes)} / ${totalBytes ? formatBytes(totalBytes) : '—'}`;
   const highlightedLines = useMemo(() => logs.slice(-400).map(highlightLine), [logs]);
 
   return (
-    <div className="min-h-screen overflow-x-hidden px-4 pb-8">
-      <div className="squircle glass-crystal shadow-float mt-5 flex min-w-0 items-center justify-between gap-4 px-6 py-4" style={{ WebkitAppRegion: 'drag' }}>
-        <div className="flex min-w-0 items-center gap-4" style={{ WebkitAppRegion: 'no-drag' }}>
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-cyan-200">⟩⟩</div>
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold text-white truncate">
-              <span className="font-extrabold">Robo</span>
-              <span className="font-light">Copy</span>{' '}
-              <span className="text-gradient">Pro</span>
-            </h1>
-            <p className="text-xs text-white/50 truncate">Simple, fast, and safe Robocopy control center.</p>
+    <div className={`h-screen w-screen overflow-hidden flex flex-col transition-colors duration-300 ${darkMode ? 'bg-[#0d0f18]' : 'bg-[#0f172a]'} font-sans antialiased text-white/90`}>
+      <div className="w-full h-full flex flex-col overflow-hidden bg-slate-950/10">
+        
+        {/* Custom Header / Titlebar */}
+        <div className="border-b border-[#1e2235] bg-[#080a10]/80 backdrop-blur-md sticky top-0 z-50 h-[68px] px-8 flex items-center justify-between flex-shrink-0 relative" style={{ WebkitAppRegion: 'drag' }}>
+          
+          {/* Bottom Gradient Border Line */}
+          <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-500 opacity-45" />
+
+          <div className="logo" style={{ WebkitAppRegion: 'no-drag' }}>
+            <img src={logoImg} className="logo-avatar-img" alt="Logo" />
+            <div className="logo-name"><b>Robo</b>Copy</div>
+            <div className="pro-badge">PRO</div>
           </div>
-        </div>
-        <div className="flex items-center gap-3" style={{ WebkitAppRegion: 'no-drag' }}>
-          <div className="glass-chip squircle flex items-center gap-3 px-4 py-2 text-xs text-white/70">
-            <button type="button" className="glass-btn px-3 py-2" onClick={() => setHelpOpen(true)}>
+
+          {/* Centered System Status Pill */}
+          <div className="nav-status-pill" style={{ WebkitAppRegion: 'no-drag' }}>
+            <div className={`nsp-dot ${status === 'running' ? 'running' : status === 'verifying' ? 'running' : status === 'completed' ? 'active' : ''}`} />
+            <span className="nsp-text">Status: <b>{status.toUpperCase()}</b></span>
+            <span className="nsp-divider">|</span>
+            <span className="nsp-text">Mode: <b>{move ? 'MOVE' : 'COPY'}</b></span>
+            <span className="nsp-divider">|</span>
+            <span className="nsp-text">Threads: <b>{threads}</b></span>
+          </div>
+          
+          <div className="tb-right" style={{ WebkitAppRegion: 'no-drag' }}>
+            <button
+              type="button"
+              className="tb-btn tb-btn-help"
+              onClick={() => setHelpOpen(true)}
+            >
               <InformationCircleIcon className="h-4 w-4" />
-              Help
+              <span>Help</span>
             </button>
-            <button type="button" className="glass-btn px-3 py-2" onClick={() => setDarkMode((prev) => !prev)}>
+            <button
+              type="button"
+              className="tb-btn tb-btn-theme"
+              onClick={() => setDarkMode((prev) => !prev)}
+            >
               {darkMode ? <MoonIcon className="h-4 w-4" /> : <SunIcon className="h-4 w-4" />}
-              {darkMode ? 'Dark' : 'Light'}
-            </button>
-            <span className="flex items-center gap-2 text-[11px] text-white/60">
-              <CommandLineIcon className="h-4 w-4" /> Ctrl + Enter
-            </span>
-          </div>
-          <div className="window-controls flex items-center gap-2">
-            <button
-              type="button"
-              className="window-btn"
-              onClick={() => window?.windowControls?.minimize()}
-              aria-label="Minimize"
-            >
-              <MinusIcon className="h-4 w-4" />
+              <span>{darkMode ? 'Dark' : 'Light'}</span>
             </button>
             <button
               type="button"
-              className="window-btn"
-              onClick={() => window?.windowControls?.maximize()}
-              aria-label="Maximize"
+              className="tb-btn tb-btn-theme"
+              style={{ color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.25)', background: 'rgba(56, 189, 248, 0.05)' }}
+              onClick={() => setShowSwitchModal(true)}
             >
-              <Square2StackIcon className="h-4 w-4" />
+              <CpuChipIcon className="h-4 w-4 text-sky-400" />
+              <span>Switch to Classic GUI</span>
             </button>
-            <button
-              type="button"
-              className="window-btn window-btn-close"
-              onClick={() => window?.windowControls?.close()}
-              aria-label="Close"
-            >
-              <XMarkIcon className="h-4 w-4" />
-            </button>
+            
+            <div className="win-btns">
+              <button
+                type="button"
+                className="win-btn"
+                onClick={() => window?.windowControls?.minimize()}
+                aria-label="Minimize"
+              >
+                <MinusIcon className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                className="win-btn"
+                onClick={() => window?.windowControls?.maximize()}
+                aria-label="Maximize"
+              >
+                <Square2StackIcon className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                className="win-btn win-btn-close"
+                onClick={() => window?.windowControls?.close()}
+                aria-label="Close"
+              >
+                <XMarkIcon className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="mt-6 grid gap-6 px-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="min-w-0 space-y-6">
-          <Panel title="Folders" description="Drag & drop or browse. Two clean boxes only.">
-            <div className="grid gap-6 md:grid-cols-2">
-              <DropZone
-                kind="source"
-                label="Source"
-                description="Drop the folder you want to copy."
-                value={source}
-                onDropPath={(value) => setSource(sanitizePath(value))}
-                onBrowse={() => handleFolderPicker(setSource, sourcePickerRef)}
-              />
-              <DropZone
-                kind="destination"
-                label="Destination"
-                description="Drop the folder that receives the files."
-                value={destination}
-                onDropPath={(value) => setDestination(sanitizePath(value))}
-                onBrowse={() => handleFolderPicker(setDestination, destinationPickerRef)}
-              />
-            </div>
-            <input
-              ref={sourcePickerRef}
-              type="file"
-              className="hidden"
-              webkitdirectory="true"
-              directory="true"
-              onChange={(event) => handleFolderChange(event, setSource)}
-            />
-            <input
-              ref={destinationPickerRef}
-              type="file"
-              className="hidden"
-              webkitdirectory="true"
-              directory="true"
-              onChange={(event) => handleFolderChange(event, setDestination)}
-            />
-          </Panel>
-
-          <Panel title="Copy Settings" description="All primary options in one focused panel.">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="md:col-span-2">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => setMove(false)}
-                    className={`crystal-item squircle p-4 text-left focus-glow ${!move ? 'gradient-ring' : ''}`}
-                  >
-                    <p className="text-sm font-semibold text-white">Copy</p>
-                    <p className="text-xs text-white/60">Keeps files in the source folder.</p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMove(true)}
-                    className={`crystal-item squircle p-4 text-left focus-glow ${move ? 'gradient-ring' : ''}`}
-                  >
-                    <p className="text-sm font-semibold text-white">Move</p>
-                    <p className="text-xs text-white/60">Removes files from source after copying.</p>
-                  </button>
-                </div>
+        {/* Main Split Layout */}
+        <div className="grid lg:grid-cols-[1.2fr_0.8fr] flex-grow min-h-0 overflow-hidden bg-[#0d0f18]">
+          
+          {/* LEFT COLUMN: Input Control Zone */}
+          <div className="p-6 space-y-6 bg-transparent border-r border-[#1a1d2e] overflow-y-auto h-full scrollbar-thin">
+            
+            {/* Folders Section */}
+            <div className="space-y-3">
+              <SectionHeader label="Folders" icon={FolderIcon} theme="blue" />
+              <div className="grid gap-4 md:grid-cols-2">
+                <DropZone
+                  kind="source"
+                  label="Source"
+                  description="Files to copy from"
+                  value={source}
+                  onDropPath={(value) => setSource(sanitizePath(value))}
+                  onBrowse={() => handleFolderPicker(setSource, sourcePickerRef)}
+                />
+                <DropZone
+                  kind="destination"
+                  label="Destination"
+                  description="Where files land"
+                  value={destination}
+                  onDropPath={(value) => setDestination(sanitizePath(value))}
+                  onBrowse={() => handleFolderPicker(setDestination, destinationPickerRef)}
+                />
               </div>
-              <div className="md:col-span-2">
+            </div>
+
+            {/* Operation Selector Toggle */}
+            <div className="space-y-3">
+              <SectionHeader label="Operation" icon={ArrowPathIcon} theme="green" />
+              <div className="op-toggle">
+                <button
+                  type="button"
+                  onClick={() => setMove(false)}
+                  className={`op-opt ${!move ? 'active' : ''}`}
+                >
+                  <div className="op-dot" />
+                  <div className="text-left">
+                    <p className="op-name">Copy</p>
+                    <p className="op-desc">Keeps originals in source</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMove(true)}
+                  className={`op-opt ${move ? 'active' : ''}`}
+                >
+                  <div className="op-dot" />
+                  <div className="text-left">
+                    <p className="op-name">Move</p>
+                    <p className="op-desc">Removes after copying</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Copy Settings */}
+            <div className="space-y-3">
+              <SectionHeader label="Copy Settings" icon={Cog6ToothIcon} theme="amber" />
+              <div className="grid grid-cols-2 gap-4">
                 <Select
                   label="Copy Mode"
                   value={copyMode}
@@ -668,272 +782,684 @@ export default function App() {
                     value: mode.id,
                     label: `${mode.label} — ${mode.description}`,
                   }))}
+                  icon={FolderIcon}
                 />
-              </div>
-              <div className="md:col-span-2">
                 <Select
                   label="Verification"
                   value={verificationMode}
                   onChange={setVerificationMode}
                   options={VERIFICATION_MODES}
+                  icon={ShieldCheckIcon}
                 />
-              </div>
-              <Toggle
-                label="High-Speed Mode"
-                description="Disables resume + logging, lowers retries, and minimizes output."
-                checked={highSpeed}
-                onChange={setHighSpeed}
-              />
-              <Toggle
-                label="Mirror Mode"
-                description="/MIR makes destination match source (deletes extras)."
-                checked={mirror}
-                onChange={setMirror}
-              />
-              <Toggle
-                label="Resume Transfers"
-                description="/Z resumes if the copy is interrupted (slower)."
-                checked={resume}
-                onChange={setResume}
-              />
-              <Toggle
-                label="Enable Logging"
-                description="/LOG writes a file log (slower on large jobs)."
-                checked={logging}
-                onChange={setLogging}
-              />
-              <div className="crystal-item squircle flex flex-col gap-3 p-4 md:col-span-2">
-                <label className="text-sm font-semibold text-white/80">Subfolder Mode</label>
-                <div className="grid gap-2">
-                  {[
-                    { id: 'all', label: 'All subfolders (/E)' },
-                    { id: 'non-empty', label: 'Only non-empty (/S)' },
-                    { id: 'none', label: 'Top level only' },
-                  ].map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => setSubdirMode(option.id)}
-                      className={`glass-btn justify-start focus-glow ${subdirMode === option.id ? 'gradient-ring' : ''}`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
 
-            <div className="mt-6">
+            {/* Options Toggle Grid */}
+            <div className="space-y-3">
+              <SectionHeader label="Options" icon={BoltIcon} theme="purple" />
+              <div className="grid grid-cols-2 gap-3">
+                <Toggle
+                  label="High-Speed Mode"
+                  description="Disable logging & resume"
+                  checked={highSpeed}
+                  onChange={setHighSpeed}
+                />
+                <Toggle
+                  label="Mirror Mode"
+                  description="Deletes extra destination files"
+                  checked={mirror}
+                  onChange={setMirror}
+                />
+                <Toggle
+                  label="Resume Transfers"
+                  description="Support paused copies (/Z)"
+                  checked={resume}
+                  onChange={setResume}
+                />
+                <Toggle
+                  label="Enable Logging"
+                  description="Generate file copy log"
+                  checked={logging}
+                  onChange={setLogging}
+                />
+              </div>
+            </div>
+
+            {/* Advanced Settings */}
+            <div className="space-y-3">
               <button
                 type="button"
-                className="glass-btn w-full justify-between focus-glow"
+                className="adv-btn"
                 onClick={() => setAdvancedOpen((prev) => !prev)}
               >
-                <span>{advancedOpen ? 'Hide Advanced Options' : 'Show Advanced Options'}</span>
-                <span className="text-white/60">{advancedOpen ? '−' : '+'}</span>
+                <CpuChipIcon className="h-4 w-4 text-slate-400" />
+                <span>Advanced Settings</span>
+                <span 
+                  className="ml-auto text-slate-400 font-bold transition-transform duration-200"
+                  style={{ transform: advancedOpen ? 'rotate(90deg)' : 'none' }}
+                >
+                  ▶
+                </span>
               </button>
-              {advancedOpen ? (
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <div className="crystal-item squircle flex flex-col gap-3 p-4">
-                    <label className="text-sm font-semibold text-white/80">Threads</label>
+              {advancedOpen && (
+                <div className="grid gap-3 grid-cols-2 p-1.5 bg-[#0a0c14]/50 rounded-xl border border-[#1e2235]/40 animate-fadeIn">
+                  <div className="tog-card flex flex-col items-start gap-1 p-3">
+                    <label className="text-[11.5px] font-semibold text-slate-400 uppercase tracking-wider">Threads</label>
                     <input
                       type="number"
                       min="1"
                       max="128"
-                      className="glass-input"
+                      className="glass-input py-1 px-2.5 text-xs bg-[#0d0f1a] border border-[#1e2235] rounded-md focus:border-blue-500/50"
                       value={threads}
                       onChange={(event) => setThreads(Number(event.target.value))}
                     />
-                    <p className="text-xs text-white/60">Higher values = faster on SSD.</p>
+                    <p className="text-[12px] text-slate-400">Parallel speed threads</p>
                   </div>
-                  <div className="crystal-item squircle flex flex-col gap-3 p-4">
-                    <label className="text-sm font-semibold text-white/80">Retry Count</label>
+                  <div className="tog-card flex flex-col items-start gap-1 p-3">
+                    <label className="text-[11.5px] font-semibold text-slate-400 uppercase tracking-wider">Retries</label>
                     <input
                       type="number"
                       min="0"
-                      className="glass-input"
+                      className="glass-input py-1 px-2.5 text-xs bg-[#0d0f1a] border border-[#1e2235] rounded-md focus:border-blue-500/50"
                       value={retries}
                       onChange={(event) => setRetries(Number(event.target.value))}
                     />
-                    <p className="text-xs text-white/60">More retries = safer but slower.</p>
+                    <p className="text-[12px] text-slate-400">Retry count on lock</p>
                   </div>
-                  <div className="crystal-item squircle flex flex-col gap-3 p-4">
-                    <label className="text-sm font-semibold text-white/80">Wait Between Retries (sec)</label>
+                  <div className="tog-card flex flex-col items-start gap-1 p-3">
+                    <label className="text-[11.5px] font-semibold text-slate-400 uppercase tracking-wider">Retry Wait (sec)</label>
                     <input
                       type="number"
                       min="0"
-                      className="glass-input"
+                      className="glass-input py-1 px-2.5 text-xs bg-[#0d0f1a] border border-[#1e2235] rounded-md focus:border-blue-500/50"
                       value={wait}
                       onChange={(event) => setWait(Number(event.target.value))}
                     />
-                    <p className="text-xs text-white/60">Longer waits reduce speed.</p>
+                    <p className="text-[12px] text-slate-400">Retry delay seconds</p>
                   </div>
-                  <div className="crystal-item squircle flex flex-col gap-3 p-4 md:col-span-2">
-                    <label className="text-sm font-semibold text-white/80">Ignore files/folders</label>
+                  <div className="tog-card flex flex-col items-start gap-1 p-3">
+                    <label className="text-[11.5px] font-semibold text-slate-400 uppercase tracking-wider">Ignore Filters</label>
                     <input
-                      className="glass-input"
-                      placeholder="node_modules, .git, *.tmp"
+                      className="glass-input py-1 px-2.5 text-xs bg-[#0d0f1a] border border-[#1e2235] rounded-md focus:border-blue-500/50"
+                      placeholder="node_modules, *.tmp"
                       value={excludeText}
                       onChange={(event) => setExcludeText(event.target.value)}
                     />
-                    <p className="text-xs text-white/60">Use commas. Prefix with file: or dir: if needed.</p>
+                    <p className="text-[12px] text-slate-400">Exclude list names</p>
                   </div>
                 </div>
-              ) : null}
+              )}
             </div>
-          </Panel>
 
-          <Panel
-            title="Presets"
-            description="Save a clean set of common profiles."
-            actions={
-              <Button variant="ghost" onClick={handleSavePreset}>
-                <ArrowDownTrayIcon className="h-5 w-5" />
-                Save Preset
-              </Button>
-            }
-          >
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="space-y-2">
-                <span className="text-sm font-semibold text-white/80">Preset Name</span>
-                <input
-                  className="glass-input w-full"
-                  value={presetName}
-                  onChange={(event) => setPresetName(event.target.value)}
-                  placeholder="Daily backup"
+            {/* Presets Manager */}
+            <div className="folder-card p-4 rounded-xl border border-[#1e2235] bg-[#111420]">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <ArrowDownTrayIcon className="h-3.5 w-3.5" />
+                  Presets
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSavePreset}
+                  disabled={!presetName.trim()}
+                  className="browse-btn !w-auto text-[10px] px-3 py-1.5 flex items-center gap-1 text-blue-400 hover:text-blue-300 disabled:opacity-40 disabled:pointer-events-none"
+                >
+                  <ArrowDownTrayIcon className="h-3 w-3" />
+                  Save Preset
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11.5px] font-semibold text-slate-400 uppercase tracking-wider block">Preset Name</label>
+                  <input
+                    className="glass-input py-1.5 px-2.5 text-xs bg-[#0d0f1a] border border-[#1e2235] rounded-md focus:border-blue-500/50 w-full"
+                    value={presetName}
+                    onChange={(event) => setPresetName(event.target.value)}
+                    placeholder="e.g. Daily Backup"
+                  />
+                </div>
+                <Select
+                  label="Load Preset"
+                  value={selectedPreset}
+                  onChange={handleLoadPreset}
+                  options={[
+                    { label: 'Select Preset', value: '' },
+                    ...presets.map((preset) => ({
+                      value: preset.name,
+                      label: preset.name,
+                    })),
+                  ]}
+                  icon={ArrowDownTrayIcon}
                 />
-              </label>
-              <Select
-                label="Load Preset"
-                value={selectedPreset}
-                onChange={handleLoadPreset}
-                options={[
-                  { label: 'Select preset', value: '' },
-                  ...presets.map((preset) => ({
-                    value: preset.name,
-                    label: preset.name,
-                  })),
-                ]}
-              />
+              </div>
             </div>
-          </Panel>
-        </div>
 
-        <div className="min-w-0 space-y-6">
-          <Panel title="Terminal" description="Command preview and live output in one place.">
-            <div className="crystal-item squircle min-w-0 overflow-hidden">
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-2 text-xs text-white/60">
-                <span>Command</span>
-                <span className="glass-pill">Live</span>
+          </div>
+
+          {/* RIGHT COLUMN: Output & Execution Zone */}
+          <div className="p-6 bg-transparent border-l border-[#1a1d2e] flex flex-col justify-between space-y-6 overflow-y-auto h-full scrollbar-thin min-h-0">
+            
+            {/* Terminal Preview & Output Logs */}
+            <div className="folder-card flex-grow flex flex-col min-h-[320px] space-y-3 relative">
+              <div className="fc-accent bg-gradient-to-r from-blue-500 to-indigo-500" />
+              
+              <div className="cmd-topbar !bg-transparent !p-0 !border-b-0 select-none">
+                <div className="cmd-title">
+                  <div className={`w-1.5 h-1.5 rounded-full ${loading ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
+                  <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <CommandLineIcon className="h-3.5 w-3.5 text-blue-400" />
+                    Command Preview & Logs
+                  </span>
+                </div>
+                <div className="cmd-tabs">
+                  <button
+                    type="button"
+                    onClick={() => setTerminalTab('command')}
+                    className={`ctab ${terminalTab === 'command' ? 'active' : ''}`}
+                  >
+                    Command
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTerminalTab('output')}
+                    className={`ctab ${terminalTab === 'output' ? 'active' : ''}`}
+                  >
+                    Output
+                  </button>
+                </div>
               </div>
-              <pre className="terminal-text min-w-0 overflow-x-auto px-4 py-4 text-sm text-cyan-200/90">
-                <code>{command}</code>
-              </pre>
+              
+              <div className="cmd-box flex flex-col flex-grow min-h-0">
+                {/* Terminal Body */}
+                <div className="cmd-body flex-grow overflow-y-auto max-h-[360px] min-h-[200px] bg-[#06080e]">
+                  {terminalTab === 'command' ? (
+                    <div className="leading-relaxed whitespace-pre-wrap break-all">
+                      <span className="cmd-prompt">&gt;</span>
+                      <span className="cmd-text">robocopy </span>
+                      <span className="cmd-arg">
+                        "{source || '<source>'}" "{destination || '<dest>'}"{" "}
+                      </span>
+                      {robocopyArgs
+                        .filter((arg) => arg !== source && arg !== destination)
+                        .map((arg, idx) => {
+                          const isFlag = arg.startsWith('/');
+                          return (
+                            <span key={idx} className={isFlag ? 'cmd-flag' : 'cmd-arg'}>
+                              {arg}{' '}
+                            </span>
+                          );
+                        })}
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {logs.length === 0 ? (
+                        <div className="flex items-center gap-1.5 font-mono text-slate-500 select-none">
+                          <span>&gt; Ready. Waiting for Robocopy execution</span>
+                          <span className="w-1.5 h-3.5 bg-blue-500 animate-blink" />
+                        </div>
+                      ) : (
+                        highlightedLines.map((line, idx) => (
+                          <p key={idx} className={`leading-relaxed whitespace-pre-wrap break-all ${line.className || ''}`}>
+                            {line.text}
+                          </p>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-            {showLogs ? (
-              <div className="mt-4">
-                <ConsoleOutput lines={logs} highlightedLines={highlightedLines} />
-              </div>
-            ) : null}
-          </Panel>
 
-          <Panel
-            title="Run & Progress"
-            description="Execute Robocopy and watch progress live."
-            actions={
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" onClick={() => setShowLogs((prev) => !prev)}>
-                  {showLogs ? 'Hide Logs' : 'Show Logs'}
-                </Button>
-                <Button onClick={handleRun} disabled={loading}>
-                  {loading ? <Spinner /> : <PlayIcon className="h-5 w-5" />}
-                  {loading ? 'Running...' : 'Run Robocopy'}
-                </Button>
+            {/* Run & Progress Dashboard */}
+            <div className="folder-card space-y-4 relative">
+              <div className="fc-accent bg-gradient-to-r from-purple-500 to-pink-500" />
+              <div className="prog-header !mt-1 !p-0 !border-b-0">
+                <div className="prog-title select-none">
+                  <CommandLineIcon className="h-4 w-4 text-purple-400" />
+                  <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest">Execution & Progress</span>
+                </div>
+                <div className={`idle-pill font-bold uppercase tracking-wider text-[9px] ${
+                  status === 'completed'
+                    ? '!bg-emerald-500/10 !text-emerald-400 border border-emerald-500/20'
+                    : status === 'running'
+                      ? '!bg-blue-500/10 !text-blue-400 border border-blue-500/20 animate-pulse'
+                      : status === 'verifying'
+                        ? '!bg-violet-500/10 !text-violet-400 border border-violet-500/20 animate-pulse'
+                        : status === 'error'
+                          ? '!bg-rose-500/10 !text-rose-400 border border-rose-500/20'
+                          : ''
+                }`}>
+                  ● {status}
+                </div>
               </div>
-            }
-          >
-            <div className="grid gap-4">
-              <StatusIndicator status={status} progress={progress} indeterminate={scanning} />
-              <div className="crystal-item squircle grid gap-2 p-4 text-xs text-white/60">
-                <div className="flex items-center justify-between">
-                  <span>Mode</span>
-                  <span className="text-white/80">{move ? 'Move' : 'Copy'}</span>
+              
+              <div className="prog-body !p-0">
+                <div className="prog-pct">
+                  {status === 'idle' ? (
+                    <span className="text-xl font-bold text-blue-400 tracking-wide">Ready to Run</span>
+                  ) : scanning ? (
+                    '—'
+                  ) : (
+                    <>
+                      {progress}
+                      <span>%</span>
+                    </>
+                  )}
                 </div>
-                <div className="flex items-center justify-between">
-                  <span>Speed</span>
-                  <span className="text-white/80">{speedText}</span>
+                
+                {/* Progress bar track */}
+                <div className="prog-bar-track">
+                  {scanning ? (
+                    <div className="h-full w-1/3 animate-pulse rounded-full bg-blue-500/70" />
+                  ) : (
+                    <div
+                      className={`prog-bar-fill transition-all duration-500 ${
+                        status === 'completed'
+                          ? '!bg-emerald-500'
+                          : status === 'error'
+                            ? '!bg-rose-500'
+                            : 'running'
+                      }`}
+                      style={{ width: `${progress}%` }}
+                    />
+                  )}
                 </div>
-                <div className="flex items-center justify-between">
-                  <span>ETA</span>
-                  <span className="text-white/80">{scanning ? 'Scanning…' : formatEta(etaSeconds)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Copied</span>
-                  <span className="text-white/80">
-                    {formatBytes(copiedBytes)} / {totalBytes ? formatBytes(totalBytes) : '—'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="flex items-center gap-2">
-                    <ShieldCheckIcon className="h-4 w-4" />
-                    Verification
-                  </span>
-                  <span className="text-right text-white/80">
-                    {verificationSummary?.skipped
-                      ? 'Skipped'
-                      : verificationSummary
-                        ? `${verificationSummary.checkedFiles || 0}/${verificationSummary.totalFiles || 0} checked`
-                        : verificationMode === 'off'
-                          ? 'Off'
-                          : verificationMode}
-                  </span>
-                </div>
-                {verificationSummary && !verificationSummary.skipped ? (
-                  <div className="flex items-center justify-between gap-4">
-                    <span>Integrity failures</span>
-                    <span className={verificationSummary.failedFiles > 0 ? 'text-rose-300' : 'text-emerald-300'}>
-                      {verificationSummary.failedFiles || 0}
-                    </span>
+
+                {/* Transfer stats display under progress bar */}
+                {status !== 'idle' && (
+                  status === 'verifying' && verificationSummary ? (
+                    <div className="text-[12px] text-slate-300 font-medium tracking-wide flex justify-between items-center mb-3.5 p-2 bg-[#0d0f1a] rounded-lg border border-[#1e2235]/40 select-none animate-fadeIn">
+                      <span className="flex-1 text-center">
+                        {verificationSummary.checkedFiles} of {verificationSummary.totalFiles || '—'} files verified
+                      </span>
+                      <span className="text-blue-500/40">|</span>
+                      <span className="flex-1 text-center">
+                        {formatBytes(verificationSummary.verifiedBytes)} of {verificationSummary.totalBytes ? formatBytes(verificationSummary.totalBytes) : '—'} verified
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-[12px] text-slate-300 font-medium tracking-wide flex justify-between items-center mb-3.5 p-2 bg-[#0d0f1a] rounded-lg border border-[#1e2235]/40 select-none animate-fadeIn">
+                      <span className="flex-1 text-center">
+                        {copiedFiles} of {totalFiles || '—'} files copied
+                      </span>
+                      <span className="text-blue-500/40">|</span>
+                      <span className="flex-1 text-center">
+                        {formatBytes(copiedBytes)} of {totalBytes ? formatBytes(totalBytes) : '—'}
+                      </span>
+                    </div>
+                  )
+                )}
+                
+                {/* Metadata labels */}
+                <div className="prog-meta-grid">
+                  <div className="pmeta">
+                    <div className="pmeta-label">Mode</div>
+                    <div className="pmeta-val">{move ? 'Move' : 'Copy'}</div>
                   </div>
-                ) : null}
+                  <div className="pmeta">
+                    <div className="pmeta-label">Speed</div>
+                    <div className="pmeta-val">{speedText}</div>
+                  </div>
+                  <div className="pmeta">
+                    <div className="pmeta-label">ETA</div>
+                    <div className="pmeta-val">{etaText}</div>
+                  </div>
+                  <div className="pmeta">
+                    <div className="pmeta-label">Verification</div>
+                    <div className="pmeta-val">
+                      {verificationSummary?.skipped
+                        ? 'Skipped'
+                        : verificationSummary
+                          ? `${verificationSummary.checkedFiles}/${verificationSummary.totalFiles}`
+                          : verificationMode === 'off'
+                            ? 'Off'
+                            : verificationMode.charAt(0).toUpperCase() + verificationMode.slice(1)}
+                    </div>
+                  </div>
+                </div>
+
+                {verificationSummary && !verificationSummary.skipped && verificationSummary.failedFiles > 0 && (
+                  <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg p-2.5 text-xs text-rose-300 flex items-center justify-between mb-4">
+                    <span>Integrity Failures:</span>
+                    <span className="font-bold">{verificationSummary.failedFiles}</span>
+                  </div>
+                )}
+                
+                {/* Run Button */}
+                <button
+                  type="button"
+                  onClick={handleRun}
+                  disabled={loading}
+                  className="run-btn active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {loading ? (
+                    <Spinner />
+                  ) : (
+                    <PlayIcon className="h-4 w-4" />
+                  )}
+                  <span>{loading ? 'Executing Robocopy...' : 'Run Robocopy'}</span>
+                </button>
+                
+                <div className="run-footer">
+                  <div className="mode-chip">
+                    <div className={`chip-dot ${move ? 'bg-emerald-500' : 'bg-blue-500'}`} />
+                    <span>{move ? 'Move mode' : 'Copy mode'}</span>
+                  </div>
+                  <div className="mode-chip">
+                    <div className={`chip-dot ${verificationMode !== 'off' ? 'chip-dot-g' : 'bg-slate-700'}`} />
+                    <span>{verificationMode !== 'off' ? 'Verified' : 'Unverified'}</span>
+                  </div>
+                  <button type="button" className="hide-log-btn hover:text-slate-400">
+                    <InformationCircleIcon className="h-3 w-3" />
+                    <span>Robocopy Pro</span>
+                  </button>
+                </div>
               </div>
             </div>
-          </Panel>
+
+          </div>
+
         </div>
+
       </div>
 
-      {helpOpen ? (
+      {/* Hidden file pickers */}
+      <input
+        ref={sourcePickerRef}
+        type="file"
+        className="hidden"
+        webkitdirectory="true"
+        directory="true"
+        onChange={(event) => handleFolderChange(event, setSource)}
+      />
+      <input
+        ref={destinationPickerRef}
+        type="file"
+        className="hidden"
+        webkitdirectory="true"
+        directory="true"
+        onChange={(event) => handleFolderChange(event, setDestination)}
+      />
+
+      {/* Help Overlay Drawer */}
+      {helpOpen && (
         <div className="fixed inset-0 z-50">
           <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
             onClick={() => setHelpOpen(false)}
           />
           <div className="absolute right-4 top-4 bottom-4 w-full max-w-md">
-            <div className="crystal-shell squircle h-full overflow-hidden p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-white/50">Help Guide</p>
-                  <h2 className="text-lg font-semibold text-white">Robocopy Quick Tips</h2>
-                </div>
-                <button type="button" className="glass-btn" onClick={() => setHelpOpen(false)}>
-                  <XMarkIcon className="h-5 w-5" />
-                </button>
-              </div>
-              <div className="mt-6 space-y-4 overflow-y-auto pr-2" style={{ maxHeight: 'calc(100% - 80px)' }}>
-                {HELP_ITEMS.map((item) => (
-                  <div key={item.title} className="crystal-item squircle p-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-white">{item.title}</p>
-                      <span className="glass-pill">{item.flag}</span>
-                    </div>
-                    <p className="mt-2 text-xs text-white/60">{item.desc}</p>
+            <div className="folder-card h-full overflow-hidden p-6 bg-[#0c0f1b]/98 border border-[#1e2235] shadow-[0_0_50px_rgba(0,0,0,0.85)] flex flex-col">
+              
+              {/* Drawer Header */}
+              <div className="flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.2rem] text-blue-400 font-bold">Help Guide</p>
+                    <h2 className="text-lg font-bold text-white mt-0.5">Quick Reference</h2>
                   </div>
-                ))}
+                  <button 
+                    type="button" 
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 border border-transparent hover:border-slate-800 transition-all" 
+                    onClick={() => setHelpOpen(false)}
+                  >
+                    <XMarkIcon className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Tab Selector */}
+                <div className="flex bg-[#07090f] border border-[#1e2235] rounded-lg p-0.5 mt-4">
+                  <button
+                    type="button"
+                    onClick={() => setHelpTab('general')}
+                    className={`text-[12.5px] flex-1 text-center py-2 rounded-md font-bold transition-all ${
+                      helpTab === 'general'
+                        ? 'bg-blue-500/15 text-blue-300 border border-blue-500/40 shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                    }`}
+                  >
+                    General Guide
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHelpTab('verification')}
+                    className={`text-[12.5px] flex-1 text-center py-2 rounded-md font-bold transition-all ${
+                      helpTab === 'verification'
+                        ? 'bg-blue-500/15 text-blue-300 border border-blue-500/40 shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                    }`}
+                  >
+                    Verification
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHelpTab('flags')}
+                    className={`text-[12.5px] flex-1 text-center py-2 rounded-md font-bold transition-all ${
+                      helpTab === 'flags'
+                        ? 'bg-blue-500/15 text-blue-300 border border-blue-500/40 shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                    }`}
+                  >
+                    CLI & Toggles
+                  </button>
+                </div>
+              </div>
+
+              {/* Scrollable Tab Content */}
+              <div className="mt-5 space-y-4 overflow-y-auto pr-1 flex-1 min-h-0 scrollbar-thin">
+                {helpTab === 'general' && (
+                  <div className="space-y-4">
+                    {/* Header Summary */}
+                    <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl">
+                      <p className="text-[13px] text-blue-200 leading-relaxed font-medium">
+                        Configure how files are copied and whether old or extra destination files are updated or removed.
+                      </p>
+                    </div>
+
+                    {/* Section 1: Transfer Mode */}
+                    <div>
+                      <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">1. Transfer Actions</h3>
+                      <div className="space-y-3">
+                        <div className="p-5 rounded-xl bg-[#161b30] border border-[#232948] hover:border-blue-500/35 shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[14px] font-bold text-white">Copy (Standard)</span>
+                            <span className="text-[10.5px] font-semibold uppercase tracking-wide px-2.5 py-0.75 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/25">Safe</span>
+                          </div>
+                          <p className="text-[13px] text-[#e0f2fe] leading-relaxed">
+                            Transfers files to the destination. Leaves all source files completely untouched. <b>Best for standard backups.</b>
+                          </p>
+                        </div>
+
+                        <div className="p-5 rounded-xl bg-[#161b30] border border-[#232948] hover:border-blue-500/35 shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[14px] font-bold text-white">Move Files</span>
+                            <span className="text-[10.5px] font-semibold uppercase tracking-wide px-2.5 py-0.75 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/25">Move & Delete</span>
+                          </div>
+                          <p className="text-[13px] text-[#e0f2fe] leading-relaxed">
+                            Copies files to destination, verifies integrity, then deletes the original source files. <b>Best for reclaiming drive space.</b>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Section 2: Sync Mode */}
+                    <div>
+                      <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">2. Destination Sync Modes</h3>
+                      <div className="space-y-3">
+                        <div className="p-5 rounded-xl bg-[#161b30] border border-[#232948] hover:border-blue-500/35 shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[14px] font-bold text-white">Copy — no deletes</span>
+                            <span className="text-[10.5px] font-semibold uppercase tracking-wide px-2.5 py-0.75 rounded-md bg-blue-500/10 text-blue-300 border border-blue-500/25">Safe Copy</span>
+                          </div>
+                          <p className="text-[13px] text-[#e0f2fe] leading-relaxed">
+                            Transfers new and updated files. Files already in the destination that are not in the source are kept safe and untouched.
+                          </p>
+                        </div>
+
+                        <div className="p-5 rounded-xl bg-[#161b30] border border-rose-500/30 hover:border-rose-500/45 shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[14px] font-bold text-rose-200">Mirror destination</span>
+                            <span className="text-[10.5px] font-semibold uppercase tracking-wide px-2.5 py-0.75 rounded-md bg-rose-500/10 text-rose-300 border border-rose-500/25">Destructive Clone</span>
+                          </div>
+                          <p className="text-[13px] text-[#e0f2fe] leading-relaxed">
+                            Forces destination folder to match source exactly. <b>Warning:</b> Any extra files in destination will be permanently deleted!
+                          </p>
+                        </div>
+
+                        <div className="p-5 rounded-xl bg-[#161b30] border border-[#232948] hover:border-blue-500/35 shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[14px] font-bold text-white">Update only</span>
+                            <span className="text-[10.5px] font-semibold uppercase tracking-wide px-2.5 py-0.75 rounded-md bg-purple-500/10 text-purple-300 border border-purple-500/25">Incremental Update</span>
+                          </div>
+                          <p className="text-[13px] text-[#e0f2fe] leading-relaxed">
+                            Only copies files that already exist in destination and are older than source counterparts. Never adds new files.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {helpTab === 'verification' && (
+                  <div className="space-y-4">
+                    {/* Header Summary */}
+                    <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl">
+                      <p className="text-[13px] text-amber-200 leading-relaxed font-semibold">
+                        🛡️ Hashing ensures that your copied files are 100% identical to the source with no byte corruption.
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-1">Verification Options</h3>
+
+                      {/* Mode 1 */}
+                      <div className="p-5 rounded-xl bg-[#161b30] border border-[#232948] hover:border-blue-500/35 shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[14px] font-bold text-slate-300">Disabled (Off)</span>
+                          <div className="flex gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.75 rounded bg-slate-500/15 text-slate-300 border border-slate-500/20">Safety: None</span>
+                            <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.75 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">Speed: Max</span>
+                          </div>
+                        </div>
+                        <p className="text-[13px] text-[#e0f2fe] leading-relaxed">
+                          Skips checksum checks entirely. Fast, but provides no integrity checks. Use only for non-critical, local files.
+                        </p>
+                      </div>
+
+                      {/* Mode 2 */}
+                      <div className="p-5 rounded-xl bg-[#161b30] border border-[#232948] hover:border-blue-500/35 shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[14px] font-bold text-blue-300">Fast Verification</span>
+                          <div className="flex gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.75 rounded bg-blue-500/15 text-blue-300 border border-blue-500/20">Safety: Basic</span>
+                            <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.75 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">Speed: Fast</span>
+                          </div>
+                        </div>
+                        <p className="text-[13px] text-[#e0f2fe] leading-relaxed">
+                          Compares file size and last-modified dates. Instant check, but cannot detect internal content/byte corruption.
+                        </p>
+                      </div>
+
+                      {/* Mode 3 */}
+                      <div className="p-5 rounded-xl bg-[#161b30] border border-blue-500/40 shadow-[0_4px_20px_rgba(59,130,246,0.08)] hover:border-blue-500/60 transition-all">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[14px] font-bold text-emerald-300 flex items-center gap-1.5">
+                            Balanced <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">RECOMMENDED</span>
+                          </span>
+                          <div className="flex gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.75 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">Safety: High</span>
+                            <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.75 rounded bg-blue-500/15 text-blue-300 border border-blue-500/20">Speed: Smart</span>
+                          </div>
+                        </div>
+                        <p className="text-[13px] text-[#e0f2fe] leading-relaxed">
+                          Checks timestamps/sizes, hashes small files completely, and block-samples large files. <b>Highly recommended</b> for general copies.
+                        </p>
+                      </div>
+
+                      {/* Mode 4 */}
+                      <div className="p-5 rounded-xl bg-[#161b30] border border-[#232948] hover:border-blue-500/35 shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[14px] font-bold text-purple-300">Strict Verification</span>
+                          <div className="flex gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.75 rounded bg-purple-500/15 text-purple-300 border border-purple-500/20">Safety: 100%</span>
+                            <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.75 rounded bg-rose-500/15 text-rose-300 border border-rose-500/20">Speed: Heavy</span>
+                          </div>
+                        </div>
+                        <p className="text-[13px] text-[#e0f2fe] leading-relaxed">
+                          Performs full SHA-256 integrity checks on every single file. Guarantees absolute correctness but increases CPU/disk load.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {helpTab === 'flags' && (
+                  <div className="space-y-4">
+                    {/* Header Summary */}
+                    <div className="p-4 bg-indigo-500/5 border border-indigo-500/20 rounded-xl">
+                      <p className="text-[13.5px] text-indigo-200 leading-relaxed font-semibold">
+                        RoboCopy Pro maps GUI toggles to native command-line arguments. Reference sheet:
+                      </p>
+                    </div>
+
+                    <div className="space-y-3.5">
+                      <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2.5 px-1">Command-Line Flags</h3>
+                      {HELP_ITEMS.map((item) => (
+                        <div key={item.title} className="p-5.5 rounded-xl bg-[#161b30] border border-[#232948] hover:border-blue-500/35 shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all flex flex-col gap-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[14.5px] font-bold text-white">{item.title}</span>
+                            <span className="text-[11.5px] font-mono font-bold tracking-[0.8px] bg-blue-500/10 text-blue-300 border border-blue-500/25 rounded-md px-3 py-1 flex-shrink-0">{item.flag}</span>
+                          </div>
+                          <p className="text-[13px] text-[#e0f2fe] leading-relaxed font-normal">{item.desc}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
-      ) : null}
+      )}
+      {/* Switch GUI Confirmation Modal */}
+      {showSwitchModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/75 backdrop-blur-md transition-opacity"
+            onClick={() => setShowSwitchModal(false)}
+          />
+          <div className="w-full max-w-sm p-7 bg-gradient-to-br from-[#12162d] to-[#070914] border border-blue-500/35 rounded-2xl shadow-[0_12px_50px_rgba(0,0,0,0.9),0_0_30px_rgba(59,130,246,0.18)] relative z-10 flex flex-col gap-5 text-center animate-fade-in">
+            <div>
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/25 mb-4 shadow-[0_0_15px_rgba(59,130,246,0.15)]">
+                <CpuChipIcon className="h-7 w-7 text-sky-400 animate-pulse" />
+              </div>
+              <h3 className="text-lg font-bold text-white tracking-wide">Switch to Classic GUI?</h3>
+              <p className="text-xs text-[#e0f2fe] mt-2.5 leading-relaxed">
+                You are about to switch to the Classic (V1) layout. The application will reload to apply the layout change.
+              </p>
+            </div>
+            <div className="flex gap-3.5">
+              <button
+                type="button"
+                className="flex-1 py-2.5 px-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-[0_4px_12px_rgba(59,130,246,0.25)] hover:shadow-[0_4px_16px_rgba(59,130,246,0.4)] transition-all transform active:scale-95"
+                onClick={() => {
+                  localStorage.setItem('gui_version', 'v1');
+                  window.location.reload();
+                }}
+              >
+                Switch Layout
+              </button>
+              <button
+                type="button"
+                className="flex-1 py-2.5 px-4 bg-[#161b30] hover:bg-[#1f2644] text-slate-300 border border-[#232948] rounded-xl text-xs font-semibold transition-all transform active:scale-95"
+                onClick={() => setShowSwitchModal(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

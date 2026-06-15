@@ -1,11 +1,11 @@
-﻿/** @type {import('tailwindcss').Config} */
+/** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Manrope', 'sans-serif'],
-        display: ['Sora', 'sans-serif'],
+        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+        display: ['Outfit', 'sans-serif'],
       },
       boxShadow: {
         soft: '0 12px 30px -18px rgba(15, 23, 42, 0.65)',
