@@ -734,16 +734,37 @@
   }
   .prog-bar-track {
     background: #0d0f1a;
-    border-radius: 3px;
-    height: 5px;
+    border-radius: 6px;
+    height: 9px;
     margin-bottom: 12px;
     overflow: hidden;
+    border: 0.5px solid rgba(255, 255, 255, 0.05);
   }
   .prog-bar-fill {
     height: 100%;
-    border-radius: 3px;
-    background: #1d4ed8;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #3b82f6 0%, #a78bfa 50%, #3b82f6 100%);
+    background-size: 200% 100%;
     width: 0%;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+  }
+  .prog-bar-fill.running {
+    animation: progressShimmer 2s linear infinite;
+  }
+  @keyframes progressShimmer {
+    0% {
+      background-position: 0% 0%;
+    }
+    100% {
+      background-position: 200% 0%;
+    }
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+  .animate-blink {
+    animation: blink 1s step-end infinite;
   }
   .prog-meta-grid {
     display: grid;
@@ -873,20 +894,26 @@
     gap: 9px;
   }
   .logo-avatar {
-    width: 30px;
-    height: 30px;
+    width: 34px;
+    height: 34px;
     background: #1d3461;
-    border-radius: 8px;
+    border-radius: 9px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
+    font-size: 15.5px;
     font-weight: 700;
     color: #60a5fa;
     border: 0.5px solid #2d4a7a;
   }
+  .logo-avatar-img {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+    border-radius: 8px;
+  }
   .logo-name {
-    font-size: 15px;
+    font-size: 16.5px;
     font-weight: 600;
     color: #e2e8f0;
     letter-spacing: -0.4px;
@@ -896,14 +923,14 @@
     font-weight: 700;
   }
   .pro-badge {
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.8px;
     background: #1d3461;
     color: #60a5fa;
     border: 0.5px solid #2d4a7a;
     border-radius: 4px;
-    padding: 2px 6px;
+    padding: 2.5px 7px;
     margin-left: 4px;
   }
   .tb-right {
@@ -914,15 +941,15 @@
   .tb-btn {
     background: #111420;
     border: 0.5px solid #1e2235;
-    border-radius: 6px;
-    padding: 6px 12px;
-    font-size: 12px;
+    border-radius: 7px;
+    padding: 8px 15px;
+    font-size: 12.5px;
     font-weight: 600;
     color: #cbd5e1;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 6.5px;
     font-family: var(--font-sans);
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     user-select: none;
@@ -973,9 +1000,9 @@
     align-items: center;
   }
   .win-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
+    width: 35px;
+    height: 35px;
+    border-radius: 7px;
     border: 0.5px solid #1e2235;
     background: #111420;
     color: #cbd5e1;
@@ -993,8 +1020,8 @@
     border-color: #3b82f6;
   }
   .win-btn svg {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     color: #cbd5e1;
   }
   .win-btn:hover svg {

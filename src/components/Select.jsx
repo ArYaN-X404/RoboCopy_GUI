@@ -5,7 +5,8 @@ const getColorForValue = (val) => {
   switch (String(val).toLowerCase()) {
     // Copy Modes
     case 'copy': return 'text-emerald-400 font-bold';
-    case 'mirror': return 'text-rose-400 font-bold';
+    case 'mirror':
+    case 'sync': return 'text-rose-400 font-bold';
     case 'update': return 'text-purple-400 font-bold';
     // Verification Modes
     case 'off': return 'text-slate-400 font-bold';
@@ -22,7 +23,8 @@ const getColorForValue = (val) => {
 const getDotForValue = (val) => {
   switch (String(val).toLowerCase()) {
     case 'copy': return 'bg-emerald-400';
-    case 'mirror': return 'bg-rose-400';
+    case 'mirror':
+    case 'sync': return 'bg-rose-400';
     case 'update': return 'bg-purple-400';
     case 'off': return 'bg-slate-400';
     case 'fast': return 'bg-blue-400';

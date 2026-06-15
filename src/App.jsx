@@ -25,6 +25,7 @@ import Spinner from './components/Spinner.jsx';
 import StatusIndicator from './components/StatusIndicator.jsx';
 import DropZone from './components/DropZone.jsx';
 import { buildRobocopyArgs, buildRobocopyCommand, COPY_MODES } from './lib/robocopyCommand.js';
+import logoImg from './assets/logo.png';
 
 const INITIAL_PRESET = {
   source: '',
@@ -158,6 +159,7 @@ export default function App() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [helpTab, setHelpTab] = useState('general');
   const [showLogs, setShowLogs] = useState(true);
+  const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [source, setSource] = useState(INITIAL_PRESET.source);
   const [destination, setDestination] = useState(INITIAL_PRESET.destination);
@@ -182,6 +184,8 @@ export default function App() {
   const [selectedPreset, setSelectedPreset] = useState('');
   const [totalBytes, setTotalBytes] = useState(0);
   const [copiedBytes, setCopiedBytes] = useState(0);
+  const [totalFiles, setTotalFiles] = useState(0);
+  const [copiedFiles, setCopiedFiles] = useState(0);
   const [speedBps, setSpeedBps] = useState(0);
   const [etaSeconds, setEtaSeconds] = useState(null);
   const [scanning, setScanning] = useState(false);
@@ -199,6 +203,21 @@ export default function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
   }, [darkMode]);
+
+  useEffect(() => {
+    if (window?.robocopy?.getInitialPaths) {
+      window.robocopy.getInitialPaths().then((paths) => {
+        if (paths?.source) setSource(paths.source);
+        if (paths?.destination) setDestination(paths.destination);
+      });
+    }
+    if (window?.robocopy?.onSetPaths) {
+      return window.robocopy.onSetPaths((paths) => {
+        if (paths?.source) setSource(paths.source);
+        if (paths?.destination) setDestination(paths.destination);
+      });
+    }
+  }, []);
 
   useEffect(() => {
     if (copyMode === 'sync') {
@@ -386,12 +405,15 @@ export default function App() {
       `Starting Robocopy session at ${new Date().toLocaleTimeString()}`,
       command,
     ]);
+    setTotalFiles(150);
+    setCopiedFiles(0);
 
     let step = 0;
     if (runTimerRef.current) clearInterval(runTimerRef.current);
     runTimerRef.current = setInterval(() => {
       step += 1;
       setProgress(Math.min(100, step * 12));
+      setCopiedFiles((prev) => Math.min(150, prev + 18));
       setLogs((prev) => [
         ...prev,
         `Copying batch ${step}...`,
@@ -402,6 +424,8 @@ export default function App() {
         setStatus('completed');
         setLoading(false);
         setLogs((prev) => [...prev, 'Completed successfully.']);
+        setProgress(100);
+        setCopiedFiles(150);
       }
     }, 650);
   };
@@ -429,6 +453,8 @@ export default function App() {
       ]);
       setCopiedBytes(0);
       setTotalBytes(0);
+      setCopiedFiles(0);
+      setTotalFiles(0);
       setSpeedBps(0);
       setEtaSeconds(null);
       setElapsedSeconds(0);
@@ -440,16 +466,22 @@ export default function App() {
       if (!highSpeed && window?.robocopy?.getFolderSize) {
         setScanning(true);
         try {
-          const size = await window.robocopy.getFolderSize(source);
+          const result = await window.robocopy.getFolderSize(source);
+          const size = typeof result === 'object' ? result.totalBytes : result;
+          const filesCount = typeof result === 'object' ? result.totalFiles : 0;
           setTotalBytes(size);
           totalBytesRef.current = size;
+          setTotalFiles(filesCount);
           setLogs((prev) => [
             ...prev,
-            size > 0 ? `Scan complete: ${formatBytes(size)}` : 'Scan complete: size unavailable.',
+            size > 0 
+              ? `Scan complete: ${formatBytes(size)} (${filesCount.toLocaleString()} files)` 
+              : 'Scan complete: size unavailable.',
           ]);
         } catch {
           setTotalBytes(0);
           totalBytesRef.current = 0;
+          setTotalFiles(0);
         } finally {
           setScanning(false);
         }
@@ -469,6 +501,9 @@ export default function App() {
           onProgress: (nextProgress, line) => {
             if (line) {
               setLogs((prev) => [...prev, line]);
+              if (/\b(New File|Newer|Older)\s+/i.test(line)) {
+                setCopiedFiles((prev) => prev + 1);
+              }
             }
             if (Number.isFinite(nextProgress) && totalBytesRef.current === 0) {
               setProgress(nextProgress);
@@ -504,6 +539,8 @@ export default function App() {
               setStatus('verifying');
               setProgress(0);
               setVerificationSummary(summary);
+              setSpeedBps(0);
+              setEtaSeconds(null);
               setLogs((prev) => [
                 ...prev,
                 `Verification started: ${summary.mode} mode, ${summary.totalFiles} files.`,
@@ -522,6 +559,17 @@ export default function App() {
                     : 100;
               setProgress(nextProgress);
               if (window?.robocopy?.setProgress) window.robocopy.setProgress(nextProgress / 100);
+
+              // Calculate verification speed and ETA
+              const elapsed = Math.max(0.1, (Date.now() - (summary.startedAt || Date.now())) / 1000);
+              const speed = summary.verifiedBytes / elapsed;
+              setSpeedBps(speed);
+              if (speed > 0) {
+                const remainingBytes = Math.max(0, summary.totalBytes - summary.verifiedBytes);
+                setEtaSeconds(remainingBytes / speed);
+              } else {
+                setEtaSeconds(null);
+              }
               return;
             }
 
@@ -561,15 +609,25 @@ export default function App() {
   };
 
   const highSpeedRunning = highSpeed && loading;
-  const speedText = highSpeedRunning ? 'Optimized mode' : speedBps > 0 ? `${formatBytes(speedBps)}/s` : '—';
-  const etaText = highSpeedRunning
-    ? 'Unavailable in high-speed mode'
-    : scanning
-      ? 'Scanning...'
-      : formatEta(etaSeconds);
-  const copiedText = highSpeedRunning
-    ? 'Tracking disabled for maximum speed'
-    : `${formatBytes(copiedBytes)} / ${totalBytes ? formatBytes(totalBytes) : '—'}`;
+  const speedText = status === 'idle'
+    ? '—'
+    : highSpeedRunning
+      ? 'Optimized mode'
+      : speedBps > 0
+        ? `${formatBytes(speedBps)}/s`
+        : '—';
+  const etaText = status === 'idle'
+    ? '—'
+    : highSpeedRunning
+      ? 'Unavailable'
+      : scanning
+        ? 'Scanning...'
+        : formatEta(etaSeconds);
+  const copiedText = status === 'idle'
+    ? '—'
+    : highSpeedRunning
+      ? 'Tracking disabled'
+      : `${formatBytes(copiedBytes)} / ${totalBytes ? formatBytes(totalBytes) : '—'}`;
   const highlightedLines = useMemo(() => logs.slice(-400).map(highlightLine), [logs]);
 
   return (
@@ -577,13 +635,13 @@ export default function App() {
       <div className="w-full h-full flex flex-col overflow-hidden bg-slate-950/10">
         
         {/* Custom Header / Titlebar */}
-        <div className="border-b border-[#1e2235] bg-[#080a10]/80 backdrop-blur-md sticky top-0 z-50 h-[48px] px-6 flex items-center justify-between flex-shrink-0 relative" style={{ WebkitAppRegion: 'drag' }}>
+        <div className="border-b border-[#1e2235] bg-[#080a10]/80 backdrop-blur-md sticky top-0 z-50 h-[68px] px-8 flex items-center justify-between flex-shrink-0 relative" style={{ WebkitAppRegion: 'drag' }}>
           
           {/* Bottom Gradient Border Line */}
           <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-500 opacity-45" />
 
           <div className="logo" style={{ WebkitAppRegion: 'no-drag' }}>
-            <div className="logo-avatar">R</div>
+            <img src={logoImg} className="logo-avatar-img" alt="Logo" />
             <div className="logo-name"><b>Robo</b>Copy</div>
             <div className="pro-badge">PRO</div>
           </div>
@@ -604,7 +662,7 @@ export default function App() {
               className="tb-btn tb-btn-help"
               onClick={() => setHelpOpen(true)}
             >
-              <InformationCircleIcon className="h-3.5 w-3.5" />
+              <InformationCircleIcon className="h-4 w-4" />
               <span>Help</span>
             </button>
             <button
@@ -612,8 +670,17 @@ export default function App() {
               className="tb-btn tb-btn-theme"
               onClick={() => setDarkMode((prev) => !prev)}
             >
-              {darkMode ? <MoonIcon className="h-3.5 w-3.5" /> : <SunIcon className="h-3.5 w-3.5" />}
+              {darkMode ? <MoonIcon className="h-4 w-4" /> : <SunIcon className="h-4 w-4" />}
               <span>{darkMode ? 'Dark' : 'Light'}</span>
+            </button>
+            <button
+              type="button"
+              className="tb-btn tb-btn-theme"
+              style={{ color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.25)', background: 'rgba(56, 189, 248, 0.05)' }}
+              onClick={() => setShowSwitchModal(true)}
+            >
+              <CpuChipIcon className="h-4 w-4 text-sky-400" />
+              <span>Switch to Classic GUI</span>
             </button>
             
             <div className="win-btns">
@@ -623,7 +690,7 @@ export default function App() {
                 onClick={() => window?.windowControls?.minimize()}
                 aria-label="Minimize"
               >
-                <MinusIcon className="h-3.5 w-3.5" />
+                <MinusIcon className="h-4 w-4" />
               </button>
               <button
                 type="button"
@@ -631,7 +698,7 @@ export default function App() {
                 onClick={() => window?.windowControls?.maximize()}
                 aria-label="Maximize"
               >
-                <Square2StackIcon className="h-3.5 w-3.5" />
+                <Square2StackIcon className="h-4 w-4" />
               </button>
               <button
                 type="button"
@@ -639,7 +706,7 @@ export default function App() {
                 onClick={() => window?.windowControls?.close()}
                 aria-label="Close"
               >
-                <XMarkIcon className="h-3.5 w-3.5" />
+                <XMarkIcon className="h-4 w-4" />
               </button>
             </div>
           </div>
@@ -713,7 +780,7 @@ export default function App() {
                   onChange={setCopyMode}
                   options={COPY_MODES.map((mode) => ({
                     value: mode.id,
-                    label: mode.label,
+                    label: `${mode.label} — ${mode.description}`,
                   }))}
                   icon={FolderIcon}
                 />
@@ -721,10 +788,7 @@ export default function App() {
                   label="Verification"
                   value={verificationMode}
                   onChange={setVerificationMode}
-                  options={VERIFICATION_MODES.map((mode) => ({
-                    value: mode.value,
-                    label: mode.value === 'off' ? 'Disabled' : mode.value.charAt(0).toUpperCase() + mode.value.slice(1),
-                  }))}
+                  options={VERIFICATION_MODES}
                   icon={ShieldCheckIcon}
                 />
               </div>
@@ -770,7 +834,12 @@ export default function App() {
               >
                 <CpuChipIcon className="h-4 w-4 text-slate-400" />
                 <span>Advanced Settings</span>
-                <span className="ml-auto text-slate-400 font-bold">{advancedOpen ? '−' : '+'}</span>
+                <span 
+                  className="ml-auto text-slate-400 font-bold transition-transform duration-200"
+                  style={{ transform: advancedOpen ? 'rotate(90deg)' : 'none' }}
+                >
+                  ▶
+                </span>
               </button>
               {advancedOpen && (
                 <div className="grid gap-3 grid-cols-2 p-1.5 bg-[#0a0c14]/50 rounded-xl border border-[#1e2235]/40 animate-fadeIn">
@@ -868,37 +937,39 @@ export default function App() {
           </div>
 
           {/* RIGHT COLUMN: Output & Execution Zone */}
-          <div className="p-6 bg-[#080a10] border-l border-[#1a1d2e] flex flex-col justify-between space-y-6 overflow-y-auto h-full scrollbar-thin min-h-0">
+          <div className="p-6 bg-transparent border-l border-[#1a1d2e] flex flex-col justify-between space-y-6 overflow-y-auto h-full scrollbar-thin min-h-0">
             
             {/* Terminal Preview & Output Logs */}
-            <div className="flex-grow flex flex-col min-h-[300px]">
-              <SectionHeader label="Command Preview & Logs" icon={CommandLineIcon} theme="blue" />
+            <div className="folder-card flex-grow flex flex-col min-h-[320px] space-y-3 relative">
+              <div className="fc-accent bg-gradient-to-r from-blue-500 to-indigo-500" />
               
-              <div className="cmd-box flex flex-col flex-grow">
-                {/* Tab Header bar */}
-                <div className="cmd-topbar">
-                  <div className="cmd-title">
-                    <div className={`w-1.5 h-1.5 rounded-full ${loading ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
-                    <span>{terminalTab === 'command' ? 'ROBOCOPY.EXE' : 'OUTPUT'}</span>
-                  </div>
-                  <div className="cmd-tabs">
-                    <button
-                      type="button"
-                      onClick={() => setTerminalTab('command')}
-                      className={`ctab ${terminalTab === 'command' ? 'active' : ''}`}
-                    >
-                      Command
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTerminalTab('output')}
-                      className={`ctab ${terminalTab === 'output' ? 'active' : ''}`}
-                    >
-                      Output
-                    </button>
-                  </div>
+              <div className="cmd-topbar !bg-transparent !p-0 !border-b-0 select-none">
+                <div className="cmd-title">
+                  <div className={`w-1.5 h-1.5 rounded-full ${loading ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
+                  <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <CommandLineIcon className="h-3.5 w-3.5 text-blue-400" />
+                    Command Preview & Logs
+                  </span>
                 </div>
-                
+                <div className="cmd-tabs">
+                  <button
+                    type="button"
+                    onClick={() => setTerminalTab('command')}
+                    className={`ctab ${terminalTab === 'command' ? 'active' : ''}`}
+                  >
+                    Command
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTerminalTab('output')}
+                    className={`ctab ${terminalTab === 'output' ? 'active' : ''}`}
+                  >
+                    Output
+                  </button>
+                </div>
+              </div>
+              
+              <div className="cmd-box flex flex-col flex-grow min-h-0">
                 {/* Terminal Body */}
                 <div className="cmd-body flex-grow overflow-y-auto max-h-[360px] min-h-[200px] bg-[#06080e]">
                   {terminalTab === 'command' ? (
@@ -922,7 +993,10 @@ export default function App() {
                   ) : (
                     <div className="space-y-1">
                       {logs.length === 0 ? (
-                        <div className="cmd-waiting">No output log yet — run a session to see live details</div>
+                        <div className="flex items-center gap-1.5 font-mono text-slate-500 select-none">
+                          <span>&gt; Ready. Waiting for Robocopy execution</span>
+                          <span className="w-1.5 h-3.5 bg-blue-500 animate-blink" />
+                        </div>
                       ) : (
                         highlightedLines.map((line, idx) => (
                           <p key={idx} className={`leading-relaxed whitespace-pre-wrap break-all ${line.className || ''}`}>
@@ -937,118 +1011,148 @@ export default function App() {
             </div>
 
             {/* Run & Progress Dashboard */}
-            <div className="space-y-4">
-              <SectionHeader label="Execution & Progress" icon={PlayIcon} theme="purple" />
+            <div className="folder-card space-y-4 relative">
+              <div className="fc-accent bg-gradient-to-r from-purple-500 to-pink-500" />
+              <div className="prog-header !mt-1 !p-0 !border-b-0">
+                <div className="prog-title select-none">
+                  <CommandLineIcon className="h-4 w-4 text-purple-400" />
+                  <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest">Execution & Progress</span>
+                </div>
+                <div className={`idle-pill font-bold uppercase tracking-wider text-[9px] ${
+                  status === 'completed'
+                    ? '!bg-emerald-500/10 !text-emerald-400 border border-emerald-500/20'
+                    : status === 'running'
+                      ? '!bg-blue-500/10 !text-blue-400 border border-blue-500/20 animate-pulse'
+                      : status === 'verifying'
+                        ? '!bg-violet-500/10 !text-violet-400 border border-violet-500/20 animate-pulse'
+                        : status === 'error'
+                          ? '!bg-rose-500/10 !text-rose-400 border border-rose-500/20'
+                          : ''
+                }`}>
+                  ● {status}
+                </div>
+              </div>
               
-              <div className="progress-card border border-[#1e2235] space-y-4 bg-[#111420]">
-                <div className="prog-header">
-                  <div className="prog-title">
-                    <CommandLineIcon className="h-4 w-4 text-slate-500" />
-                    <span>Current Status</span>
-                  </div>
-                  <div className={`idle-pill font-bold uppercase tracking-wider text-[9px] ${
-                    status === 'completed'
-                      ? '!bg-emerald-500/10 !text-emerald-400 border border-emerald-500/20'
-                      : status === 'running'
-                        ? '!bg-blue-500/10 !text-blue-400 border border-blue-500/20 animate-pulse'
-                        : status === 'verifying'
-                          ? '!bg-violet-500/10 !text-violet-400 border border-violet-500/20 animate-pulse'
-                          : status === 'error'
-                            ? '!bg-rose-500/10 !text-rose-400 border border-rose-500/20'
-                            : ''
-                  }`}>
-                    ● {status}
-                  </div>
+              <div className="prog-body !p-0">
+                <div className="prog-pct">
+                  {status === 'idle' ? (
+                    <span className="text-xl font-bold text-blue-400 tracking-wide">Ready to Run</span>
+                  ) : scanning ? (
+                    '—'
+                  ) : (
+                    <>
+                      {progress}
+                      <span>%</span>
+                    </>
+                  )}
                 </div>
                 
-                <div className="prog-body">
-                  <div className="prog-pct">
-                    {scanning ? '—' : `${progress}`}
-                    <span>%</span>
-                  </div>
-                  
-                  {/* Progress bar track */}
-                  <div className="prog-bar-track">
-                    {scanning ? (
-                      <div className="h-full w-1/3 animate-pulse rounded-full bg-blue-500/70" />
-                    ) : (
-                      <div
-                        className={`prog-bar-fill transition-all duration-500 ${
-                          status === 'completed'
-                            ? '!bg-emerald-500'
-                            : status === 'error'
-                              ? '!bg-rose-500'
-                              : '!bg-blue-600'
-                        }`}
-                        style={{ width: `${progress}%` }}
-                      />
-                    )}
-                  </div>
-                  
-                  {/* Metadata labels */}
-                  <div className="prog-meta-grid">
-                    <div className="pmeta">
-                      <div className="pmeta-label">Mode</div>
-                      <div className="pmeta-val">{move ? 'Move' : 'Copy'}</div>
-                    </div>
-                    <div className="pmeta">
-                      <div className="pmeta-label">Speed</div>
-                      <div className="pmeta-val">{speedText}</div>
-                    </div>
-                    <div className="pmeta">
-                      <div className="pmeta-label">ETA</div>
-                      <div className="pmeta-val">{etaText}</div>
-                    </div>
-                    <div className="pmeta">
-                      <div className="pmeta-label">Verification</div>
-                      <div className="pmeta-val">
-                        {verificationSummary?.skipped
-                          ? 'Skipped'
-                          : verificationSummary
-                            ? `${verificationSummary.checkedFiles}/${verificationSummary.totalFiles}`
-                            : verificationMode === 'off'
-                              ? 'Off'
-                              : verificationMode.charAt(0).toUpperCase() + verificationMode.slice(1)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {verificationSummary && !verificationSummary.skipped && verificationSummary.failedFiles > 0 && (
-                    <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg p-2.5 text-xs text-rose-300 flex items-center justify-between mb-4">
-                      <span>Integrity Failures:</span>
-                      <span className="font-bold">{verificationSummary.failedFiles}</span>
-                    </div>
+                {/* Progress bar track */}
+                <div className="prog-bar-track">
+                  {scanning ? (
+                    <div className="h-full w-1/3 animate-pulse rounded-full bg-blue-500/70" />
+                  ) : (
+                    <div
+                      className={`prog-bar-fill transition-all duration-500 ${
+                        status === 'completed'
+                          ? '!bg-emerald-500'
+                          : status === 'error'
+                            ? '!bg-rose-500'
+                            : 'running'
+                      }`}
+                      style={{ width: `${progress}%` }}
+                    />
                   )}
-                  
-                  {/* Run Button */}
-                  <button
-                    type="button"
-                    onClick={handleRun}
-                    disabled={loading}
-                    className="run-btn active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
-                  >
-                    {loading ? (
-                      <Spinner />
-                    ) : (
-                      <PlayIcon className="h-4 w-4" />
-                    )}
-                    <span>{loading ? 'Executing Robocopy...' : 'Run Robocopy'}</span>
-                  </button>
-                  
-                  <div className="run-footer">
-                    <div className="mode-chip">
-                      <div className={`chip-dot ${move ? 'bg-emerald-500' : 'bg-blue-500'}`} />
-                      <span>{move ? 'Move mode' : 'Copy mode'}</span>
+                </div>
+
+                {/* Transfer stats display under progress bar */}
+                {status !== 'idle' && (
+                  status === 'verifying' && verificationSummary ? (
+                    <div className="text-[12px] text-slate-300 font-medium tracking-wide flex justify-between items-center mb-3.5 p-2 bg-[#0d0f1a] rounded-lg border border-[#1e2235]/40 select-none animate-fadeIn">
+                      <span className="flex-1 text-center">
+                        {verificationSummary.checkedFiles} of {verificationSummary.totalFiles || '—'} files verified
+                      </span>
+                      <span className="text-blue-500/40">|</span>
+                      <span className="flex-1 text-center">
+                        {formatBytes(verificationSummary.verifiedBytes)} of {verificationSummary.totalBytes ? formatBytes(verificationSummary.totalBytes) : '—'} verified
+                      </span>
                     </div>
-                    <div className="mode-chip">
-                      <div className={`chip-dot ${verificationMode !== 'off' ? 'chip-dot-g' : 'bg-slate-700'}`} />
-                      <span>{verificationMode !== 'off' ? 'Verified' : 'Unverified'}</span>
+                  ) : (
+                    <div className="text-[12px] text-slate-300 font-medium tracking-wide flex justify-between items-center mb-3.5 p-2 bg-[#0d0f1a] rounded-lg border border-[#1e2235]/40 select-none animate-fadeIn">
+                      <span className="flex-1 text-center">
+                        {copiedFiles} of {totalFiles || '—'} files copied
+                      </span>
+                      <span className="text-blue-500/40">|</span>
+                      <span className="flex-1 text-center">
+                        {formatBytes(copiedBytes)} of {totalBytes ? formatBytes(totalBytes) : '—'}
+                      </span>
                     </div>
-                    <button type="button" className="hide-log-btn hover:text-slate-400">
-                      <InformationCircleIcon className="h-3 w-3" />
-                      <span>Robocopy Pro</span>
-                    </button>
+                  )
+                )}
+                
+                {/* Metadata labels */}
+                <div className="prog-meta-grid">
+                  <div className="pmeta">
+                    <div className="pmeta-label">Mode</div>
+                    <div className="pmeta-val">{move ? 'Move' : 'Copy'}</div>
                   </div>
+                  <div className="pmeta">
+                    <div className="pmeta-label">Speed</div>
+                    <div className="pmeta-val">{speedText}</div>
+                  </div>
+                  <div className="pmeta">
+                    <div className="pmeta-label">ETA</div>
+                    <div className="pmeta-val">{etaText}</div>
+                  </div>
+                  <div className="pmeta">
+                    <div className="pmeta-label">Verification</div>
+                    <div className="pmeta-val">
+                      {verificationSummary?.skipped
+                        ? 'Skipped'
+                        : verificationSummary
+                          ? `${verificationSummary.checkedFiles}/${verificationSummary.totalFiles}`
+                          : verificationMode === 'off'
+                            ? 'Off'
+                            : verificationMode.charAt(0).toUpperCase() + verificationMode.slice(1)}
+                    </div>
+                  </div>
+                </div>
+
+                {verificationSummary && !verificationSummary.skipped && verificationSummary.failedFiles > 0 && (
+                  <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg p-2.5 text-xs text-rose-300 flex items-center justify-between mb-4">
+                    <span>Integrity Failures:</span>
+                    <span className="font-bold">{verificationSummary.failedFiles}</span>
+                  </div>
+                )}
+                
+                {/* Run Button */}
+                <button
+                  type="button"
+                  onClick={handleRun}
+                  disabled={loading}
+                  className="run-btn active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                >
+                  {loading ? (
+                    <Spinner />
+                  ) : (
+                    <PlayIcon className="h-4 w-4" />
+                  )}
+                  <span>{loading ? 'Executing Robocopy...' : 'Run Robocopy'}</span>
+                </button>
+                
+                <div className="run-footer">
+                  <div className="mode-chip">
+                    <div className={`chip-dot ${move ? 'bg-emerald-500' : 'bg-blue-500'}`} />
+                    <span>{move ? 'Move mode' : 'Copy mode'}</span>
+                  </div>
+                  <div className="mode-chip">
+                    <div className={`chip-dot ${verificationMode !== 'off' ? 'chip-dot-g' : 'bg-slate-700'}`} />
+                    <span>{verificationMode !== 'off' ? 'Verified' : 'Unverified'}</span>
+                  </div>
+                  <button type="button" className="hide-log-btn hover:text-slate-400">
+                    <InformationCircleIcon className="h-3 w-3" />
+                    <span>Robocopy Pro</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -1313,6 +1417,45 @@ export default function App() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Switch GUI Confirmation Modal */}
+      {showSwitchModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/75 backdrop-blur-md transition-opacity"
+            onClick={() => setShowSwitchModal(false)}
+          />
+          <div className="w-full max-w-sm p-7 bg-gradient-to-br from-[#12162d] to-[#070914] border border-blue-500/35 rounded-2xl shadow-[0_12px_50px_rgba(0,0,0,0.9),0_0_30px_rgba(59,130,246,0.18)] relative z-10 flex flex-col gap-5 text-center animate-fade-in">
+            <div>
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/25 mb-4 shadow-[0_0_15px_rgba(59,130,246,0.15)]">
+                <CpuChipIcon className="h-7 w-7 text-sky-400 animate-pulse" />
+              </div>
+              <h3 className="text-lg font-bold text-white tracking-wide">Switch to Classic GUI?</h3>
+              <p className="text-xs text-[#e0f2fe] mt-2.5 leading-relaxed">
+                You are about to switch to the Classic (V1) layout. The application will reload to apply the layout change.
+              </p>
+            </div>
+            <div className="flex gap-3.5">
+              <button
+                type="button"
+                className="flex-1 py-2.5 px-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-[0_4px_12px_rgba(59,130,246,0.25)] hover:shadow-[0_4px_16px_rgba(59,130,246,0.4)] transition-all transform active:scale-95"
+                onClick={() => {
+                  localStorage.setItem('gui_version', 'v1');
+                  window.location.reload();
+                }}
+              >
+                Switch Layout
+              </button>
+              <button
+                type="button"
+                className="flex-1 py-2.5 px-4 bg-[#161b30] hover:bg-[#1f2644] text-slate-300 border border-[#232948] rounded-xl text-xs font-semibold transition-all transform active:scale-95"
+                onClick={() => setShowSwitchModal(false)}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-﻿const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electron', {
   selectFolder: () => ipcRenderer.invoke('robocopy:select-folder'),
@@ -79,4 +79,10 @@ contextBridge.exposeInMainWorld('robocopy', {
   },
   setProgress: (value) => ipcRenderer.send('robocopy:ui-progress', value),
   getFolderSize: (path) => ipcRenderer.invoke('robocopy:folder-size', path),
+  getInitialPaths: () => ipcRenderer.invoke('robocopy:get-initial-paths'),
+  onSetPaths: (callback) => {
+    const listener = (_, paths) => callback(paths);
+    ipcRenderer.on('robocopy:set-paths', listener);
+    return () => ipcRenderer.removeListener('robocopy:set-paths', listener);
+  },
 });
