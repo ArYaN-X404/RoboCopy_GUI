@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="https://github.com/ArYaN-X404/RoboCopy_GUI/releases/latest">
-  <img src="https://img.shields.io/badge/Download-v1.0.0-blue?style=for-the-badge&logo=windows"/>
+  <img src="https://img.shields.io/badge/Download-v2.0.0-blue?style=for-the-badge&logo=windows"/>
 </a>
   <a href="#"><img src="https://img.shields.io/github/stars/ArYaN-X404/RoboCopy_GUI?style=for-the-badge"/></a>
   <a href="#"><img src="https://img.shields.io/github/issues/ArYaN-X404/RoboCopy_GUI?style=for-the-badge"/></a>
@@ -35,18 +35,28 @@
 
 <div align="center">
 
-### 🧩 Setup Interface
-<img src="docs/screenshot-main.png" width="800"/>
-
----
-
-### ⚡ Running Transfer (Live)
-<img src="docs/screenshot-running.png" width="800"/>
-
----
-
-### ✅ Completed Transfer
-<img src="docs/screenshot-completed.png" width="800"/>
+<table>
+  <tr>
+    <td align="center">
+      <b>🧩 Setup Interface</b><br>
+      <img src="docs/screenshot-main.png" width="400"/>
+    </td>
+    <td align="center">
+      <b>⚡ Running Transfer (Live)</b><br>
+      <img src="docs/screenshot-running.png" width="400"/>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <b>✅ Completed Transfer</b><br>
+      <img src="docs/screenshot-completed.png" width="400"/>
+    </td>
+    <td align="center">
+      <b>🖥️ Classic UI / Old GUI</b><br>
+      <img src="docs/screenshot-classic.png" width="400"/>
+    </td>
+  </tr>
+</table>
 
 </div>
 
